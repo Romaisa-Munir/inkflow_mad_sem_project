@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
       routes: {
         // When navigating to the "/" route, build the HomeScreen widget.
         '/': (context) => HomeScreen(),
-        // When navigating to the "/second" route, build the Library widget.
+        // When navigating to the "/library" route, build the Library widget.
         '/library': (context) => Library(),
       },
     );
