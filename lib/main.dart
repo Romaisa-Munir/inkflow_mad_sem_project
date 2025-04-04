@@ -54,13 +54,14 @@ class MyApp extends StatelessWidget {
       sounds like a problem when database is implemented
       tapping on book in library -> takes to book chapters -> chapter contents
       tapping on 'read' in book detail screen -> book chapters -> chapter contents
+      issue: back arrow on app bar in home page, resolve that
        */
 
 
     );
   }
 }
-//sample books (temporary)
+// sample data (temporary)
 final List<Map<String, String>> books = [
   {
     "title": "The Hobbit",
@@ -118,6 +119,7 @@ class HomeScreen extends StatelessWidget{
       appBar: AppBar(title:Text('Inkflow'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
+        automaticallyImplyLeading: true,
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -263,7 +265,7 @@ class HomeScreen extends StatelessWidget{
               ),
             ),
 
-            // 'Authors' Title with "See All" option
+            // 'Authors' title with "See All" option
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
@@ -320,12 +322,15 @@ class HomeScreen extends StatelessWidget{
           ],
         ),
       ),
+
       // Bottom Nav Bar
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,  // Ensures labels are always visible
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded), label: 'Create'),
           BottomNavigationBarItem(icon: Icon(Icons.my_library_books_rounded), label: 'Library'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: 0, // HomeScreen Index
         onTap: (index) {
@@ -398,10 +403,12 @@ class Library extends StatelessWidget{
         },
       ),
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,  // Ensures labels are always visible
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded), label: 'Create'),
           BottomNavigationBarItem(icon: Icon(Icons.my_library_books_rounded), label: 'Library'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: 2, // Library Index
         onTap: (index) {
