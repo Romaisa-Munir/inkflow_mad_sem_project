@@ -40,24 +40,10 @@ class MyApp extends StatelessWidget {
         '/': (context) => HomeScreen(),
         // When navigating to the "/library" route, build the Library widget.
         '/library': (context) => Library(),
+        '/book_detail': (context) => BookDetail(book: {},),
+        '/all_books': (context) => Books(),
+        '/all_authors': (context)=> Authors(),
       },
-
-      /* future routes: (to do list if i can finish other major stuff)
-      tap a book -> book detail screen with read, like, add to library, subscribe/buy option
-      books(see all button) -> books listed based on num of likes or maybe
-                               alphabetical order? with search bar
-      tap on author -> author detail screen with their books, followers, likes etc
-      author(see all button) -> authors listed based on num of likes or maybe
-                                alphabetical order? with search bar
-      work more on library (it ain't complete)
-      THIS IS SO MUCH ITS 2:18 am rn. Maybe keep the book contents empty for now.
-      sounds like a problem when database is implemented
-      tapping on book in library -> takes to book chapters -> chapter contents
-      tapping on 'read' in book detail screen -> book chapters -> chapter contents
-      issue: back arrow on app bar in home page, resolve that
-       */
-
-
     );
   }
 }
@@ -92,7 +78,7 @@ final List<Map<String, String>> books = [
 final List<Map<String, dynamic>> authors = [
   {
     "name": "J.R.R. Tolkien",
-    "profileUrl": "https://via.placeholder.com/150", // Replace with actual image
+    "profileUrl": "https://via.placeholder.com/150",
     "followers": 0,
     "likes": 0,
   },
@@ -145,8 +131,7 @@ class HomeScreen extends StatelessWidget{
                   Text("Books", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   TextButton(
                     onPressed: () {
-                      // future implementation: Romaisa (book detail screen)
-                      // while u're working on create and profile
+                      Navigator.pushNamed(context, '/all_books');
                     },
                     child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
                   )
@@ -163,7 +148,16 @@ class HomeScreen extends StatelessWidget{
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 itemBuilder: (context, index) {
                   final book = books[index];
-                  return Padding(
+                  return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BookDetail(book: book),
+                          ),
+                        );
+                      },
+                  child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -201,6 +195,7 @@ class HomeScreen extends StatelessWidget{
                         ),
                       ],
                     ),
+                  )
                   );
                 },
               ),
@@ -274,9 +269,7 @@ class HomeScreen extends StatelessWidget{
                   Text("Authors", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   TextButton(
                     onPressed: () {
-                      // future implementation: Romaisa (author page with search bar)
-                      //sorted by amount of followers i guess (we can discuss this later)
-                      // while u're working on create and profile
+                      Navigator.pushNamed(context, '/all_authors');
                     },
                     child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
                   )
@@ -356,51 +349,67 @@ class Library extends StatelessWidget{
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
       ),
-      body: ListView.builder(
-        padding: EdgeInsets.all(16),
-        itemCount: books.length,
-        itemBuilder: (context, index) {
-          final book = books[index];
-          return Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Book cover
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    book["coverUrl"]!,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.fill,
-                  ),
-                ),
-                SizedBox(width: 16),
-                // Book details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        book["title"]!,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+      body: Column(
+        children: [
+          SizedBox(height: 20),
+
+          // Search Bar
+          Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: StandardSearchBar(
+                width: double.infinity,
+                horizontalPadding: 10,
+              )
+          ),
+          Expanded(child:ListView.builder(
+            padding: EdgeInsets.all(16),
+            itemCount: books.length,
+            itemBuilder: (context, index) {
+              final book = books[index];
+              return Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Book cover
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        book["coverUrl"]!,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.fill,
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        "By ${book["author"]!}",
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                    ),
+                    SizedBox(width: 16),
+                    // Book details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            book["title"]!,
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "By ${book["author"]!}",
+                            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                          ),
+                          SizedBox(height: 8),
+                        ],
                       ),
-                      SizedBox(height: 8),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        },
+              );
+            },
+          ),
+          ),
+
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,  // Ensures labels are always visible
@@ -417,6 +426,275 @@ class Library extends StatelessWidget{
             Navigator.pushNamed(context, '/');
           }
         },
+      ),
+    );
+  }
+}
+// BOOK DETAIL PAGE
+class BookDetail extends StatefulWidget {
+  final Map<String, String> book;
+
+  const BookDetail({super.key, required this.book});
+
+  @override
+  _BookDetailState createState() => _BookDetailState();
+}
+
+class _BookDetailState extends State<BookDetail> {
+  bool isLiked = false;
+  bool isInLibrary = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.book["title"]!)),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Book Cover
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                widget.book["coverUrl"]!,
+                width: 150,
+                height: 200,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 150,
+                    height: 200,
+                    color: Colors.grey.shade300,
+                    child: Icon(Icons.image_not_supported, size: 40),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 10),
+
+            // Book Title & Author
+            Text(widget.book["title"]!, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text("by ${widget.book["author"]!}", style: TextStyle(fontSize: 18, color: Colors.grey[700])),
+
+            SizedBox(height: 20),
+
+            // Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Read Button
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // will lead to screen with book chapters
+                  },
+                  icon: Icon(Icons.book),
+                  label: Text("Read"),
+                ),
+
+                // Like Button
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      isLiked = !isLiked;
+                    });
+                  },
+                  icon: Icon(isLiked ? Icons.favorite : Icons.favorite_border, color: isLiked ? Colors.red : null),
+                ),
+
+                // Add to Library
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      isInLibrary = !isInLibrary;
+                    });
+                  },
+                  icon: Icon(isInLibrary ? Icons.check_circle : Icons.library_add, color: isInLibrary ? Colors.green : null),
+                ),
+
+                // Subscribe / Buy
+                ElevatedButton.icon(
+                  onPressed: () {
+                  },
+                  icon: Icon(Icons.shopping_cart),
+                  label: Text("Buy"),
+                ),
+
+
+              ],
+            ),
+            SizedBox(height: 5,),
+            Text('Description...'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// BOOKS PAGE
+class Books extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Books'),
+        backgroundColor: Theme
+            .of(context)
+            .colorScheme
+            .inversePrimary,
+        centerTitle: true,
+      ),
+
+      body: Column(
+        children: [
+          SizedBox(height: 20),
+
+          // Search Bar
+          Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: StandardSearchBar(
+                width: double.infinity,
+                horizontalPadding: 10,
+              )
+          ),
+          Expanded(child: ListView.builder(
+            padding: EdgeInsets.all(16),
+            itemCount: books.length,
+            itemBuilder: (context, index) {
+              final book = books[index];
+              return Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Book cover
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        book["coverUrl"]!,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    // Book details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            book["title"]!,
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "By ${book["author"]!}",
+                            style: TextStyle(
+                                fontSize: 14, color: Colors.grey.shade700),
+                          ),
+                          SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// AUTHORS PAGE
+class Authors extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Authors'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          SizedBox(height: 20),
+
+          // Search Bar
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: StandardSearchBar(
+              width: double.infinity,
+              horizontalPadding: 10,
+            ),
+          ),
+
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.all(16),
+              itemCount: authors.length,
+              itemBuilder: (context, index) {
+                final author = authors[index];
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Author Profile Picture (Fixed Size)
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(50), // Make it round
+                          child: Image.network(
+                            author["profileUrl"]!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: Colors.grey.shade300,
+                                  child: Icon(Icons.person, size: 40, color: Colors.grey),
+                                ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+
+                      // Author Details (Flexible to prevent overflow)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              author["name"]!,
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "Followers: ${author["followers"]}",
+                              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                            ),
+                            Text(
+                              "Likes: ${author["likes"]}",
+                              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
