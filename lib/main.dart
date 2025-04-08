@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'pages/writing_dashboard.dart';
+import 'pages/profile/profile_page.dart';
+import 'pages/login_signup/login_screen.dart';
+import 'pages/login_signup/signup_screen.dart';
+
 import 'package:standard_searchbar/old/standard_searchbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -21,7 +26,9 @@ class MyApp extends StatelessWidget {
           primary: Colors.deepPurple,
           secondary: Colors.deepPurpleAccent,
         ),
-
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.deepPurple.shade100,
+        ),
         // NavBar theme
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: Colors.deepPurple.shade100,
@@ -95,10 +102,55 @@ final List<Map<String, dynamic>> authors = [
     "likes": 0,
   },
 ];
+class HomeScreen extends StatefulWidget{
+  @override
+  HomeScreenState createState() =>HomeScreenState();
+}
 // HOME SCREEN
-class HomeScreen extends StatelessWidget{
-  const HomeScreen({super.key});
+class HomeScreenState extends State<HomeScreen>{
+  // For searching
+  List<Map<String, String>> filteredBooks = [];
+  List<Map<String, dynamic>> filteredAuthors = [];
 
+  @override
+  void initState() {
+    super.initState();
+    filteredBooks = List.from(books);
+    filteredAuthors = List.from(authors);
+  }
+
+  void searchAll(String query) {
+    final lower = query.toLowerCase();
+    setState(() {
+      filteredBooks = books.where((book) =>
+      book['title']!.toLowerCase().contains(lower) ||
+          book['author']!.toLowerCase().contains(lower)
+      ).toList();
+
+      filteredAuthors = authors.where((author) =>
+          author['name'].toLowerCase().contains(lower)
+      ).toList();
+    });
+  }
+
+  void searchBooks(String query) {
+    final lower = query.toLowerCase();
+    setState(() {
+      filteredBooks = books.where((book) =>
+      book['title']!.toLowerCase().contains(lower) ||
+          book['author']!.toLowerCase().contains(lower)
+      ).toList();
+    });
+  }
+
+  void searchAuthors(String query) {
+    final lower = query.toLowerCase();
+    setState(() {
+      filteredAuthors = authors.where((author) =>
+          author['name'].toLowerCase().contains(lower)
+      ).toList();
+    });
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,6 +171,7 @@ class HomeScreen extends StatelessWidget{
                 child: StandardSearchBar(
                   width: double.infinity,
                   horizontalPadding: 10,
+                  onChanged: searchAll,
                 )
             ),
 
@@ -157,45 +210,45 @@ class HomeScreen extends StatelessWidget{
                           ),
                         );
                       },
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Book Cover
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            book["coverUrl"]!,
-                            width: 150,
-                            height: 200,
-                            fit: BoxFit.fill,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Book Cover
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                book["coverUrl"]!,
                                 width: 150,
                                 height: 200,
-                                color: Colors.grey.shade300,
-                                child: Icon(Icons.image_not_supported, size: 40),
-                              );
-                            },
-                          ),
+                                fit: BoxFit.fill,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 150,
+                                    height: 200,
+                                    color: Colors.grey.shade300,
+                                    child: Icon(Icons.image_not_supported, size: 40),
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            // Book Title
+                            Container(
+                              width: 150,
+                              height: 35,
+                              child: Text(
+                                book["title"]!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 5),
-                        // Book Title
-                        Container(
-                          width: 150,
-                          height: 35,
-                          child: Text(
-                            book["title"]!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
+                      )
                   );
                 },
               ),
@@ -331,6 +384,18 @@ class HomeScreen extends StatelessWidget{
           if (index == 2) {
             Navigator.pushNamed(context, '/library');
           }
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => WritingDashboard()),
+            );
+          }
+          if (index == 3) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ProfilePage()),
+            );
+          }
         },
       ),
     );
@@ -425,6 +490,19 @@ class Library extends StatelessWidget{
           if (index == 0) {
             Navigator.pushNamed(context, '/');
           }
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => WritingDashboard()),
+            );
+          }
+          if (index == 3) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ProfilePage()),
+            );
+          }
+
         },
       ),
     );
