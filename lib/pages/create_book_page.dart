@@ -43,7 +43,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Create New Book"),
-        backgroundColor: Colors.purple,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
@@ -107,7 +107,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
                 icon: Icon(Icons.photo_library),
                 label: Text("Pick Cover Image"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
+                  backgroundColor: Theme.of(context).colorScheme.inversePrimary,
                 ),
               ),
               SizedBox(height: 30), // replaces Spacer()
@@ -115,7 +115,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
                 child: ElevatedButton(
                   onPressed: _submitForm,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.purple,
+                    backgroundColor: Theme.of(context).colorScheme.inversePrimary,
                     padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                   ),
                   child: Text("Create Book", style: TextStyle(fontSize: 18)),

@@ -5,28 +5,36 @@ import 'signup_screen.dart';
 class LoginScreen extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final Color lavender = Color(0xFFE6E6FA);
-  final Color borderLavender = Color(0xFFB497BD); // Slightly deeper lavender for contrast
 
   @override
   Widget build(BuildContext context) {
+    // colors of app
+    final primaryColor = Theme.of(context).primaryColor;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final inversePrimaryColor = Theme.of(context).colorScheme.inversePrimary;
+
     InputDecoration inputDecoration(String label) {
       return InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: borderLavender),
+        labelStyle: TextStyle(color: primaryColor),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: borderLavender),
+          borderSide: BorderSide(color: primaryColor),
           borderRadius: BorderRadius.circular(12),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: borderLavender, width: 2),
+          borderSide: BorderSide(color: secondaryColor, width: 2),
           borderRadius: BorderRadius.circular(12),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text("Login"), backgroundColor: lavender, automaticallyImplyLeading: false,),
+      appBar: AppBar(
+        title: Text("Login"),
+        backgroundColor: inversePrimaryColor,
+        automaticallyImplyLeading: false,
+        centerTitle: true, // To match your other AppBars
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -44,12 +52,11 @@ class LoginScreen extends StatelessWidget {
             SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => HomeScreen()));
+                Navigator.pushReplacementNamed(context, '/'); // Use named route instead
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: lavender,
-                foregroundColor: Colors.black,
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -59,9 +66,11 @@ class LoginScreen extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => SignupScreen()));
+                Navigator.pushNamed(context, '/signup'); // Use named route
               },
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor, // Match text color to theme
+              ),
               child: Text("Don't have an account? Sign up"),
             )
           ],

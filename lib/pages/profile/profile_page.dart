@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../writing_dashboard.dart';
 import 'settings_page.dart'; // Import the SettingsPage
 
 class ProfilePage extends StatefulWidget {
@@ -84,7 +85,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Profile"),
-        backgroundColor: Colors.purple,
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -136,6 +137,32 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,  // Ensures labels are always visible
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded), label: 'Create'),
+          BottomNavigationBarItem(icon: Icon(Icons.my_library_books_rounded), label: 'Library'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+        currentIndex: 3, // Profile Index
+        onTap: (index) {
+          // Home screen index
+          if (index == 0) {
+            Navigator.pushNamed(context, '/');
+          }
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => WritingDashboard()),
+            );
+          }
+          if (index == 2) {
+            Navigator.pushNamed(context, '/library');
+          }
+
+        },
       ),
     );
   }

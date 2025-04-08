@@ -35,7 +35,7 @@ class _WritingDashboardState extends State<WritingDashboard> {
     return Scaffold(
       appBar: AppBar(
         title: Text("My Stories"),
-        backgroundColor: Colors.purple,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: books.isEmpty
           ? Center(
@@ -55,7 +55,7 @@ class _WritingDashboardState extends State<WritingDashboard> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToCreateBook,
-        backgroundColor: Colors.purple,
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         child: Icon(Icons.add),
       ),
     );

@@ -63,7 +63,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.book.title),
-        backgroundColor: Colors.purple,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -91,7 +91,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             ElevatedButton(
               onPressed: _addChapter,
               child: Text('Add Chapter'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+              style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.inversePrimary),
             ),
             SizedBox(height: 20),
             Expanded(

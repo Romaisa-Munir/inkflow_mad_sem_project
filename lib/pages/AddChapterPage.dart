@@ -44,7 +44,7 @@ class _AddChapterPageState extends State<AddChapterPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.initialTitle == null ? 'Add Chapter' : 'Edit Chapter'),
-        backgroundColor: Colors.purple,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -93,7 +93,7 @@ class _AddChapterPageState extends State<AddChapterPage> {
               ElevatedButton(
                 onPressed: _saveChapter,
                 child: Text(widget.initialTitle == null ? 'Save Chapter' : 'Update Chapter'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.inversePrimary,),
               ),
             ],
           ),

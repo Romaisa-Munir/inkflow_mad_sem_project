@@ -17,7 +17,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Settings"),
-        backgroundColor: Colors.purple,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -84,7 +84,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 // Ideally, save the settings here (e.g., to a database or local storage)
                 Navigator.pop(context); // Go back to the Profile page
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+              style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.inversePrimary,),
               child: Text("Save Settings"),
             ),
           ],
