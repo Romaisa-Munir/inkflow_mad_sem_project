@@ -4,6 +4,8 @@ import 'pages/profile/profile_page.dart';
 import 'pages/login_signup/login_screen.dart';
 import 'pages/login_signup/signup_screen.dart';
 
+//https://pub.dev/packages/standard_searchbar
+//https://pub.dev/packages/google_fonts
 import 'package:standard_searchbar/old/standard_searchbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -41,7 +43,7 @@ class MyApp extends StatelessWidget {
         textTheme: GoogleFonts.cinzelTextTheme(),
       ),
       // Routes
-      initialRoute: '/',
+      initialRoute: '/login',
       routes: {
         // When navigating to the "/" route, build the HomeScreen widget.
         '/': (context) => HomeScreen(),
@@ -50,6 +52,8 @@ class MyApp extends StatelessWidget {
         '/book_detail': (context) => BookDetail(book: {},),
         '/all_books': (context) => Books(),
         '/all_authors': (context)=> Authors(),
+        '/login': (context) => LoginScreen(),
+        '/signup': (context) => SignupScreen(),
       },
     );
   }
@@ -108,7 +112,7 @@ class HomeScreen extends StatefulWidget{
 }
 // HOME SCREEN
 class HomeScreenState extends State<HomeScreen>{
-  // For searching
+  // For searching both books and authors
   List<Map<String, String>> filteredBooks = [];
   List<Map<String, dynamic>> filteredAuthors = [];
 
@@ -132,32 +136,13 @@ class HomeScreenState extends State<HomeScreen>{
       ).toList();
     });
   }
-
-  void searchBooks(String query) {
-    final lower = query.toLowerCase();
-    setState(() {
-      filteredBooks = books.where((book) =>
-      book['title']!.toLowerCase().contains(lower) ||
-          book['author']!.toLowerCase().contains(lower)
-      ).toList();
-    });
-  }
-
-  void searchAuthors(String query) {
-    final lower = query.toLowerCase();
-    setState(() {
-      filteredAuthors = authors.where((author) =>
-          author['name'].toLowerCase().contains(lower)
-      ).toList();
-    });
-  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title:Text('Inkflow'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
-        automaticallyImplyLeading: true,
+        automaticallyImplyLeading: false, // removes back arrow(not needed on home screen)
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -196,11 +181,11 @@ class HomeScreenState extends State<HomeScreen>{
             SizedBox(
               height: 240,
               child: ListView.builder(
-                itemCount: books.length,
+                itemCount: filteredBooks.length,
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 itemBuilder: (context, index) {
-                  final book = books[index];
+                  final book = filteredBooks[index];
                   return GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -277,10 +262,10 @@ class HomeScreenState extends State<HomeScreen>{
               margin: EdgeInsets.only(bottom: 5),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: books.length,
+                itemCount: filteredBooks.length,
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 itemBuilder: (context, index) {
-                  final book = books[index];
+                  final book = filteredBooks[index];
                   return Padding(
                     padding: EdgeInsets.all(8),
                     child: Column(
@@ -336,10 +321,10 @@ class HomeScreenState extends State<HomeScreen>{
               margin: EdgeInsets.only(bottom: 20),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: authors.length,
+                itemCount: filteredAuthors.length,
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 itemBuilder: (context, index) {
-                  final author = authors[index];
+                  final author = filteredAuthors[index];
                   return Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
@@ -403,8 +388,39 @@ class HomeScreenState extends State<HomeScreen>{
 }
 
 // LIBRARY PAGE
-class Library extends StatelessWidget{
-  const Library({super.key});
+class Library extends StatefulWidget {
+  @override
+  _LibraryState createState() => _LibraryState();
+}
+
+class _LibraryState extends State<Library> {
+  List<Map<String, String>> filteredBooks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with all books
+    filteredBooks = List.from(books);
+  }
+
+  void searchBooks(String query) {
+    final lower = query.toLowerCase();
+    if (query.isEmpty) {
+      // If query is empty, show all books
+      setState(() {
+        filteredBooks = List.from(books);
+      });
+      return;
+    }
+    // Filter books that contain the query in title or author
+    setState(() {
+      filteredBooks = books.where((book) {
+        final titleMatch = book['title']?.toLowerCase().contains(lower) ?? false;
+        final authorMatch = book['author']?.toLowerCase().contains(lower) ?? false;
+        return titleMatch || authorMatch;
+      }).toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -424,56 +440,59 @@ class Library extends StatelessWidget{
               child: StandardSearchBar(
                 width: double.infinity,
                 horizontalPadding: 10,
+                onChanged: searchBooks,
               )
           ),
-          Expanded(child:ListView.builder(
-            padding: EdgeInsets.all(16),
-            itemCount: books.length,
-            itemBuilder: (context, index) {
-              final book = books[index];
-              return Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Book cover
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        book["coverUrl"]!,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.fill,
+          Expanded(
+            child: filteredBooks.isEmpty
+                ? Center(child: Text("No books found"))
+                : ListView.builder(
+              padding: EdgeInsets.all(16),
+              itemCount: filteredBooks.length,
+              itemBuilder: (context, index) {
+                final book = filteredBooks[index];
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Book cover
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          book["coverUrl"]!,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.fill,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 16),
-                    // Book details
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            book["title"]!,
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            "By ${book["author"]!}",
-                            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                          ),
-                          SizedBox(height: 8),
-                        ],
+                      SizedBox(width: 16),
+                      // Book details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              book["title"]!,
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "By ${book["author"]!}",
+                              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                            ),
+                            SizedBox(height: 8),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-          ),
-
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -611,7 +630,39 @@ class _BookDetailState extends State<BookDetail> {
 }
 
 // BOOKS PAGE
-class Books extends StatelessWidget {
+class Books extends StatefulWidget{
+  @override
+  BooksState createState() =>BooksState();
+}
+class BooksState extends State<Books>{
+  List<Map<String, String>> filteredBooks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with all books
+    filteredBooks = List.from(books);
+  }
+
+  void searchBooks(String query) {
+    final lower = query.toLowerCase();
+    if (query.isEmpty) {
+      // If query is empty, show all books
+      setState(() {
+        filteredBooks = List.from(books);
+      });
+      return;
+    }
+    // Filter books that contain the query in title or author
+    setState(() {
+      filteredBooks = books.where((book) {
+        final titleMatch = book['title']?.toLowerCase().contains(lower) ?? false;
+        final authorMatch = book['author']?.toLowerCase().contains(lower) ?? false;
+        return titleMatch || authorMatch;
+      }).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -634,13 +685,14 @@ class Books extends StatelessWidget {
               child: StandardSearchBar(
                 width: double.infinity,
                 horizontalPadding: 10,
+                onChanged: searchBooks,
               )
           ),
           Expanded(child: ListView.builder(
             padding: EdgeInsets.all(16),
-            itemCount: books.length,
+            itemCount: filteredBooks.length,
             itemBuilder: (context, index) {
-              final book = books[index];
+              final book = filteredBooks[index];
               return Padding(
                 padding: EdgeInsets.only(bottom: 16),
                 child: Row(
@@ -691,7 +743,28 @@ class Books extends StatelessWidget {
   }
 }
 // AUTHORS PAGE
-class Authors extends StatelessWidget {
+class Authors extends StatefulWidget {
+  @override
+  _AuthorsState createState() => _AuthorsState();
+}
+
+class _AuthorsState extends State<Authors> {
+  List<Map<String, dynamic>> filteredAuthors = [];
+
+  @override
+  void initState() {
+    super.initState();
+    filteredAuthors = List.from(authors);
+  }
+
+  void searchAuthors(String query) {
+    final lower = query.toLowerCase();
+    setState(() {
+      filteredAuthors = authors.where((author) =>
+          author['name'].toLowerCase().contains(lower)
+      ).toList();
+    });
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -710,15 +783,16 @@ class Authors extends StatelessWidget {
             child: StandardSearchBar(
               width: double.infinity,
               horizontalPadding: 10,
+              onChanged: searchAuthors,
             ),
           ),
 
           Expanded(
             child: ListView.builder(
               padding: EdgeInsets.all(16),
-              itemCount: authors.length,
+              itemCount: filteredAuthors.length,
               itemBuilder: (context, index) {
-                final author = authors[index];
+                final author = filteredAuthors[index];;
                 return Padding(
                   padding: EdgeInsets.only(bottom: 16),
                   child: Row(
