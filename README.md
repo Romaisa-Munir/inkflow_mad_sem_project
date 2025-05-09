@@ -1,6 +1,5 @@
 # InkFlow - Book Reading & Writing Platform
 
-## Overview
 InkFlow is a Flutter-based mobile application that provides a platform for reading and writing books. The app allows users to browse through books, follow authors, and maintain their personal library. Writers can create and publish their own stories with customizable chapters. This project is a collaborative semester assignment that will be enhanced with Firebase backend integration in future iterations.
 
 ## Features
