@@ -34,7 +34,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
         description: _description,
         coverUrl: _coverImage?.path,
       );
-      Navigator.pop(context, newBook); // Return the new book to dashboard
+      Navigator.pop(context, newBook); // Return the new books to dashboard
     }
   }
 
@@ -58,7 +58,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               TextFormField(
-                decoration: InputDecoration(hintText: 'Enter book title'),
+                decoration: InputDecoration(hintText: 'Enter books title'),
                 onChanged: (value) => _title = value,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -73,7 +73,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               TextFormField(
-                decoration: InputDecoration(hintText: 'Enter book description'),
+                decoration: InputDecoration(hintText: 'Enter books description'),
                 onChanged: (value) => _description = value,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
