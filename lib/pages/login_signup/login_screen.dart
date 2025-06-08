@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../main.dart';
-import 'signup_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();
@@ -52,7 +50,7 @@ class LoginScreen extends StatelessWidget {
             SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/'); // Use named route instead
+                Navigator.pushNamed(context, '/');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
