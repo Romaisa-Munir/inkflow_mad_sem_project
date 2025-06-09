@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+import '../../data/auth_service.dart';
+
 class LoginScreen extends StatelessWidget {
+  final AuthService _authService = AuthService(); // Add this line
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -38,6 +41,38 @@ class LoginScreen extends StatelessWidget {
     }
   }
 
+  void _handleLogin(BuildContext context) async {
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Please fill in all fields"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    String? result = await _authService.signIn(email, password);
+    if (result == null) {
+      // Success - navigate to home
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("✅ Login successful!"),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pushReplacementNamed(context, '/');
+    } else {
+      // Show error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("❌ $result"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
   @override
   Widget build(BuildContext context) {
     // colors of app
@@ -83,9 +118,7 @@ class LoginScreen extends StatelessWidget {
             ),
             SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/');
-              },
+              onPressed: () => _handleLogin(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
