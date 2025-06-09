@@ -1,8 +1,53 @@
 import 'package:flutter/material.dart';
 
+import '../../data/auth_service.dart';
+
 class SignupScreen extends StatelessWidget {
+  final AuthService _authService = AuthService(); // Add this line
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  // void _testAuthService() {
+  //   print("Testing AuthService...");
+  //   AuthService testService = AuthService();
+  //   print("AuthService created successfully");
+  // }
+  void _handleSignup(BuildContext context) async {
+    print("🔥 _handleSignup called!");
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Please fill in all fields"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    String? result = await _authService.signUp(email, password);
+
+    if (result == null) {
+      // Success
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("✅ Account created successfully!"),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pushReplacementNamed(context, '/login');
+    } else {
+      // Show error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("❌ $result"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +93,7 @@ class SignupScreen extends StatelessWidget {
             ),
             SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/login');
-              },
+              onPressed: () => _handleSignup(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,

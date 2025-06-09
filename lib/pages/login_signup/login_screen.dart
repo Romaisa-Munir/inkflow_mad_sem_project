@@ -8,38 +8,38 @@ class LoginScreen extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  // Firebase test function
-  void _testFirebase(BuildContext context) async {
-    try {
-      DatabaseReference ref = FirebaseDatabase.instance.ref().child('test');
-      DataSnapshot snapshot = await ref.get();
-
-      if (snapshot.exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("✅ Firebase connected! Data: ${snapshot.value}"),
-              backgroundColor: Colors.green,
-            )
-        );
-        print("Firebase test successful: ${snapshot.value}");
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("⚠️ Firebase connected but no data found"),
-              backgroundColor: Colors.orange,
-            )
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("❌ Firebase error: $e"),
-            backgroundColor: Colors.red,
-          )
-      );
-      print("Firebase error: $e");
-    }
-  }
+  // // Firebase test function
+  // void _testFirebase(BuildContext context) async {
+  //   try {
+  //     DatabaseReference ref = FirebaseDatabase.instance.ref().child('test');
+  //     DataSnapshot snapshot = await ref.get();
+  //
+  //     if (snapshot.exists) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text("✅ Firebase connected! Data: ${snapshot.value}"),
+  //             backgroundColor: Colors.green,
+  //           )
+  //       );
+  //       print("Firebase test successful: ${snapshot.value}");
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text("⚠️ Firebase connected but no data found"),
+  //             backgroundColor: Colors.orange,
+  //           )
+  //       );
+  //     }
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text("❌ Firebase error: $e"),
+  //           backgroundColor: Colors.red,
+  //         )
+  //     );
+  //     print("Firebase error: $e");
+  //   }
+  // }
 
   void _handleLogin(BuildContext context) async {
     String email = emailController.text.trim();
@@ -131,18 +131,6 @@ class LoginScreen extends StatelessWidget {
             ),
             SizedBox(height: 15),
             // Add Firebase test button
-            ElevatedButton(
-              onPressed: () => _testFirebase(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text("Test Firebase"),
-            ),
             TextButton(
               onPressed: () {
                 Navigator.pushNamed(context, '/signup'); // Use named route
