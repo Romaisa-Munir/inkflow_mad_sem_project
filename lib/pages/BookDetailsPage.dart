@@ -69,9 +69,9 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            widget.book.coverUrl != null && widget.book.coverUrl!.isNotEmpty
+            widget.book.coverImage != null && widget.book.coverImage!.isNotEmpty
                 ? Image.file(
-              File(widget.book.coverUrl!),
+              File(widget.book.coverImage!),
               height: 200,
               width: double.infinity,
               fit: BoxFit.cover,
