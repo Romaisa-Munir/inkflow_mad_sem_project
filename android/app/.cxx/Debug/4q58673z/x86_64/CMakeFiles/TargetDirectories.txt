@@ -1,0 +1,2 @@
+C:/Users/hp/Desktop/ENDSEMMAD/inkflow_mad_sem_project/android/app/.cxx/Debug/4q58673z/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/hp/Desktop/ENDSEMMAD/inkflow_mad_sem_project/android/app/.cxx/Debug/4q58673z/x86_64/CMakeFiles/rebuild_cache.dir
