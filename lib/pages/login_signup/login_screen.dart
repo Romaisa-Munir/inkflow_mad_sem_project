@@ -59,40 +59,6 @@ class LoginScreen extends StatelessWidget {
     }
   }
 
-  // ✅ Test connection to Firebase Realtime Database
-  void _testFirebase(BuildContext context) async {
-    try {
-      // Connect to the "test" node in your database
-      DatabaseReference ref = FirebaseDatabase.instance.ref().child('test');
-      DataSnapshot snapshot = await ref.get();
-
-      // Check if data exists
-      if (snapshot.exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("✅ Firebase connected! Data: ${snapshot.value}"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("⚠️ Firebase connected but no data found"),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e) {
-      // Handle error in fetching data
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("❌ Firebase error: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     // 🎨 Colors pulled from your theme
@@ -156,20 +122,6 @@ class LoginScreen extends StatelessWidget {
               child: Text("Login"),
             ),
             SizedBox(height: 15),
-
-            // 🧪 Firebase test button (checks connection to Realtime DB)
-            ElevatedButton(
-              onPressed: () => _testFirebase(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text("Test Firebase"),
-            ),
 
             // 🔁 Link to Sign Up page
             TextButton(
