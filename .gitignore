@@ -44,3 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android build cache
+android/app/.cxx/
+android/.gradle/
+android/app/build/
