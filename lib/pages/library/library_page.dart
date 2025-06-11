@@ -3,6 +3,8 @@ import 'package:standard_searchbar/old/standard_searchbar.dart';
 import '../../data/sample_data.dart';
 import '../writing_dashboard.dart';
 import '../profile/profile_page.dart';
+import '../books/book_detail.dart'; // Add this import
+
 // LIBRARY PAGE
 class Library extends StatefulWidget {
   @override
@@ -66,43 +68,61 @@ class _LibraryState extends State<Library> {
               itemCount: filteredBooks.length,
               itemBuilder: (context, index) {
                 final book = filteredBooks[index];
-                return Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Book cover
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          book["coverUrl"]!,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.fill,
-                        ),
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookDetail(book: book),
                       ),
-                      SizedBox(width: 16),
-                      // Book details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              book["title"]!,
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              "By ${book["author"]!}",
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                            ),
-                            SizedBox(height: 8),
-                          ],
+                    );
+                  },
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Book cover
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            book["coverUrl"]!,
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.fill,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 80,
+                                height: 80,
+                                color: Colors.grey.shade300,
+                                child: Icon(Icons.image_not_supported, size: 30),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 16),
+                        // Book details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                book["title"]!,
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                "By ${book["author"]!}",
+                                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                              ),
+                              SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -136,7 +156,6 @@ class _LibraryState extends State<Library> {
               MaterialPageRoute(builder: (context) => ProfilePage()),
             );
           }
-
         },
       ),
     );

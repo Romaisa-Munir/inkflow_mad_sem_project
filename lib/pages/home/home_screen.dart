@@ -155,7 +155,7 @@ class HomeScreenState extends State<HomeScreen>{
               ),
             ),
 
-            // My Library (horizontally scrollable)
+            // My Library (horizontally scrollable) - FIXED WITH GESTURE DETECTOR
             Container(
               height: 160,
               margin: EdgeInsets.only(bottom: 5),
@@ -165,32 +165,50 @@ class HomeScreenState extends State<HomeScreen>{
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 itemBuilder: (context, index) {
                   final book = filteredBooks[index];
-                  return Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ClipRRect( // for rounded corners to make it look pretty
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            book["coverUrl"]!,
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookDetail(book: book),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRRect( // for rounded corners to make it look pretty
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              book["coverUrl"]!,
+                              width: 100,
+                              height: 120,
+                              fit: BoxFit.fill,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 100,
+                                  height: 120,
+                                  color: Colors.grey.shade300,
+                                  child: Icon(Icons.image_not_supported, size: 30),
+                                );
+                              },
+                            ),
+                          ),
+                          SizedBox(height: 5),
+                          Container(
                             width: 100,
-                            height: 120,
-                            fit: BoxFit.fill,
+                            child: Text(
+                              book["title"]!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 5),
-                        Container(
-                          width: 100,
-                          child: Text(
-                            book["title"]!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },
