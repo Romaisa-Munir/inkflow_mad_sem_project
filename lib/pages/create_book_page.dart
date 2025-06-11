@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/book_model.dart';
+import '../services/author_service.dart';
 
 class CreateBookPage extends StatefulWidget {
   @override
@@ -30,7 +31,25 @@ class _CreateBookPageState extends State<CreateBookPage> {
       });
     }
   }
+  // from romaisa: added this function
+  Future<void> _updateUserAuthorStatus() async {
+    try {
+      final String userId = _auth.currentUser!.uid;
 
+      // Set the isAuthor flag and update lastActive
+      await _database.child('users/$userId').update({
+        'isAuthor': true,
+        'lastActive': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      // Also update the role to writer in the profile section
+      await _database.child('users/$userId/profile/role').set('writer');
+
+      print('Updated user author status for user: $userId');
+    } catch (e) {
+      print('Error updating user author status: $e');
+    }
+  }
   Future<String?> _convertImageToBase64() async {
     if (_coverImage == null) return null;
 
@@ -102,8 +121,11 @@ class _CreateBookPageState extends State<CreateBookPage> {
         // Save book to database under users/{userId}/books/{bookId}
         await _database.child('users/$userId/books/$bookId').set(bookData);
 
+
         // Update user role to writer
         await _updateUserRole();
+ // from Romaisa: added this one line and an import (author_service.dart)
+        await AuthorService.onBookCreated(bookId);
 
         // Create Book object for return (you'll need to create this model)
         final newBook = Book(
@@ -114,6 +136,8 @@ class _CreateBookPageState extends State<CreateBookPage> {
           authorId: userId,
           createdAt: DateTime.now().millisecondsSinceEpoch,
         );
+      // from romaisa: added this one line
+        await _updateUserAuthorStatus();
 
         setState(() {
           _isLoading = false;
