@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../../models/book_model.dart';
 import '../../models/author_model.dart';
 import '../../services/author_service.dart';
+import '../authors/author_details_page.dart';
 import '../writing_dashboard.dart';
 import '../profile/profile_page.dart';
 import '../books/book_detail.dart';
@@ -479,23 +480,34 @@ class HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 itemBuilder: (context, index) {
                   final author = filteredAuthors[index];
-                  return Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildAuthorAvatar(author),
-                        SizedBox(height: 4),
-                        Container(
-                          width: 70,
-                          child: Text(
-                            author.name,
-                            style: TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
+                  return GestureDetector( // Add this GestureDetector
+                    onTap: () {
+                      // Navigate to author details page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AuthorDetailsPage(author: author),
                         ),
-                      ],
+                      );
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildAuthorAvatar(author),
+                          SizedBox(height: 4),
+                          Container(
+                            width: 70,
+                            child: Text(
+                              author.name,
+                              style: TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },

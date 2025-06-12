@@ -4,7 +4,6 @@ class AuthorModel {
   final String email;
   final String? profileImageUrl;
   final int bookCount;
-  final int followers;
   final int likes;
   final DateTime joinedDate;
   final bool isAuthor;
@@ -16,7 +15,6 @@ class AuthorModel {
     required this.email,
     this.profileImageUrl,
     required this.bookCount,
-    required this.followers,
     required this.likes,
     required this.joinedDate,
     this.isAuthor = true,
@@ -37,7 +35,6 @@ class AuthorModel {
       email: data['email'] ?? '',
       profileImageUrl: data['profileImageUrl'],
       bookCount: data['bookCount'] ?? 0,
-      followers: data['followers'] ?? 0,
       likes: data['likes'] ?? 0,
       joinedDate: DateTime.fromMillisecondsSinceEpoch(
         data['joinedDate'] ?? DateTime.now().millisecondsSinceEpoch,
@@ -56,7 +53,6 @@ class AuthorModel {
       'email': email,
       'profileImageUrl': profileImageUrl,
       'bookCount': bookCount,
-      'followers': followers,
       'likes': likes,
       'joinedDate': joinedDate.millisecondsSinceEpoch,
       'isAuthor': isAuthor,
@@ -82,7 +78,6 @@ class AuthorModel {
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       bookCount: bookCount ?? this.bookCount,
-      followers: followers ?? this.followers,
       likes: likes ?? this.likes,
       joinedDate: joinedDate ?? this.joinedDate,
       isAuthor: isAuthor ?? this.isAuthor,
@@ -92,7 +87,7 @@ class AuthorModel {
 
   @override
   String toString() {
-    return 'AuthorModel(id: $id, name: $name, email: $email, bookCount: $bookCount, followers: $followers, likes: $likes)';
+    return 'AuthorModel(id: $id, name: $name, email: $email, bookCount: $bookCount, likes: $likes)';
   }
 
   @override

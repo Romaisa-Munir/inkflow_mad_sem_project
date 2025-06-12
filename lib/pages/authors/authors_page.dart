@@ -5,6 +5,7 @@ import '../../models/author_model.dart';
 import '../../services/author_service.dart';
 import '../writing_dashboard.dart';
 import '../profile/profile_page.dart';
+import 'author_details_page.dart';
 
 class Authors extends StatefulWidget {
   @override
@@ -74,40 +75,6 @@ class _AuthorsState extends State<Authors> {
     await _fetchAuthors();
   }
 
-  Future<void> _handleFollowToggle(AuthorModel author) async {
-    try {
-      final bool isCurrentlyFollowing = await AuthorService.isFollowing(author.id);
-
-      if (isCurrentlyFollowing) {
-        await AuthorService.unfollowAuthor(author.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Unfollowed ${author.name}')),
-          );
-        }
-      } else {
-        await AuthorService.followAuthor(author.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Following ${author.name}')),
-          );
-        }
-      }
-
-      // Refresh the authors list to update follow counts
-      _refreshAuthors();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating follow status'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Widget _buildAuthorCard(AuthorModel author) {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
@@ -157,30 +124,15 @@ class _AuthorsState extends State<Authors> {
                     ),
                   ),
                   SizedBox(height: 2),
-                  Wrap(
-                    spacing: 16,
+                  // Remove followers, keep only likes
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.people_outline, size: 16, color: Colors.grey.shade600),
-                          SizedBox(width: 4),
-                          Text(
-                            "${author.followers} followers",
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.favorite_outline, size: 16, color: Colors.grey.shade600),
-                          SizedBox(width: 4),
-                          Text(
-                            "${author.likes} likes",
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
+                      Icon(Icons.favorite_outline, size: 16, color: Colors.grey.shade600),
+                      SizedBox(width: 4),
+                      Text(
+                        "${author.likes} likes",
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
@@ -188,26 +140,24 @@ class _AuthorsState extends State<Authors> {
               ),
             ),
 
-            // Follow button
-            FutureBuilder<bool>(
-              future: AuthorService.isFollowing(author.id),
-              builder: (context, snapshot) {
-                final bool isFollowing = snapshot.data ?? false;
-                return OutlinedButton(
-                  onPressed: () => _handleFollowToggle(author),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: isFollowing ? Theme.of(context).primaryColor : null,
-                    side: BorderSide(color: Theme.of(context).primaryColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  ),
-                  child: Text(
-                    isFollowing ? 'Following' : 'Follow',
-                    style: TextStyle(
-                      color: isFollowing ? Colors.white : Theme.of(context).primaryColor,
-                    ),
+            // View button (replacing Follow button)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AuthorDetailsPage(author: author),
                   ),
                 );
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              child: Text(
+                'View',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
