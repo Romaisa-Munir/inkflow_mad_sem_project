@@ -22,12 +22,8 @@ class AuthorModel {
   });
 
   factory AuthorModel.fromMap(String id, Map<String, dynamic> data) {
-    // Create a better name fallback
-    String name = data['name'] ??
-        data['displayName'] ??
-        data['username'] ??
-        data['email']?.split('@')[0] ??
-        'Author${id.substring(0, 6)}';
+    // Improved name resolution
+    String name = _resolveDisplayName(data, id);
 
     return AuthorModel(
       id: id,
@@ -44,6 +40,42 @@ class AuthorModel {
           ? DateTime.fromMillisecondsSinceEpoch(data['lastActive'])
           : null,
     );
+  }
+
+  /// Helper method to resolve the best display name from available data
+  static String _resolveDisplayName(Map<String, dynamic> data, String id) {
+    String? name;
+
+    // First priority: name field (if set and not default)
+    name = data['name'];
+    if (name != null && name.isNotEmpty && name != 'Your Username') {
+      return name;
+    }
+
+    // Second priority: displayName
+    name = data['displayName'];
+    if (name != null && name.isNotEmpty && name != 'Your Username') {
+      return name;
+    }
+
+    // Third priority: username
+    name = data['username'];
+    if (name != null && name.isNotEmpty && name != 'Your Username') {
+      return name;
+    }
+
+    // Fourth priority: email prefix (if email exists)
+    String? email = data['email'];
+    if (email != null && email.isNotEmpty) {
+      String emailPrefix = email.split('@')[0];
+      if (emailPrefix.isNotEmpty && emailPrefix.length > 1) {
+        // Capitalize first letter and make it more readable
+        return emailPrefix[0].toUpperCase() + emailPrefix.substring(1);
+      }
+    }
+
+    // Last resort: generate a user-friendly name
+    return 'Author${id.substring(0, 6)}';
   }
 
   Map<String, dynamic> toMap() {

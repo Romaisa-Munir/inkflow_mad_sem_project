@@ -20,11 +20,17 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
   bool _disposed = false;
   String? _errorMessage;
 
+  // Dynamic author stats that get recalculated
+  int _currentTotalLikes = 0;
+  int _currentBookCount = 0;
+  String _currentAuthorName = '';
+
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
 
   @override
   void initState() {
     super.initState();
+    _currentAuthorName = widget.author.name; // Initialize with passed name
     _loadAuthorBooks();
   }
 
@@ -44,6 +50,7 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
       });
 
       List<Book> books = [];
+      int totalLikes = 0;
 
       print('Loading books for author ID: ${widget.author.id}');
 
@@ -53,49 +60,79 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
           .once();
 
       print('Books snapshot exists: ${booksEvent.snapshot.exists}');
-      print('Books snapshot value: ${booksEvent.snapshot.value}');
 
       if (booksEvent.snapshot.exists && booksEvent.snapshot.value != null) {
         Map<dynamic, dynamic> booksData = booksEvent.snapshot.value as Map<dynamic, dynamic>;
 
         print('Found ${booksData.length} books for author');
 
-        booksData.forEach((key, value) {
-          if (value != null) {
-            try {
-              Map<String, dynamic> bookMap = Map<String, dynamic>.from(value);
+        for (var bookEntry in booksData.entries) {
+          final String bookId = bookEntry.key;
+          final Map<String, dynamic> bookMap = Map<String, dynamic>.from(bookEntry.value);
 
-              print('Processing book: ${bookMap['title']} with status: ${bookMap['status']}');
+          try {
+            print('Processing book: ${bookMap['title']} with status: ${bookMap['status']}');
 
-              // Include ALL books (remove status filter for debugging)
-              Book book = Book(
-                id: bookMap['id'] ?? key,
-                title: bookMap['title'] ?? 'Untitled',
-                description: bookMap['description'] ?? 'No description',
-                coverImage: bookMap['coverImage'],
-                authorId: bookMap['authorId'] ?? widget.author.id,
-                createdAt: bookMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
-                status: bookMap['status'] ?? 'draft',
-              );
-              books.add(book);
-              print('Added book: ${book.title}');
-            } catch (e) {
-              print('Error parsing book: $e');
+            // Get the current likes count for this book from the global likes node
+            DatabaseEvent likesEvent = await _database
+                .child('books/$bookId/likes')
+                .once();
+
+            int likesCount = 0;
+            if (likesEvent.snapshot.exists && likesEvent.snapshot.value != null) {
+              Map<dynamic, dynamic> likesData = likesEvent.snapshot.value as Map<dynamic, dynamic>;
+              likesCount = likesData.length;
             }
+
+            // Add to total likes
+            totalLikes += likesCount;
+
+            // Update the book's likesCount in the author's collection if needed
+            if (bookMap['likesCount'] != likesCount) {
+              await _database
+                  .child('users/${widget.author.id}/books/$bookId/likesCount')
+                  .set(likesCount);
+            }
+
+            // Create book with updated likes count
+            Book book = Book(
+              id: bookId,
+              title: bookMap['title'] ?? 'Untitled',
+              description: bookMap['description'] ?? 'No description',
+              coverImage: bookMap['coverImage'],
+              authorId: bookMap['authorId'] ?? widget.author.id,
+              createdAt: bookMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+              status: bookMap['status'] ?? 'draft',
+              likesCount: likesCount, // Use the current likes count
+            );
+
+            books.add(book);
+            print('Added book: ${book.title} with ${book.likesCount} likes');
+          } catch (e) {
+            print('Error parsing book $bookId: $e');
           }
-        });
+        }
       } else {
         print('No books found for author ${widget.author.id}');
       }
 
-      // Sort books by creation date (newest first)
-      books.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Sort books by likes count first, then by creation date (newest first)
+      books.sort((a, b) {
+        final likesComparison = b.likesCount.compareTo(a.likesCount);
+        if (likesComparison != 0) return likesComparison;
+        return b.createdAt.compareTo(a.createdAt);
+      });
 
-      print('Final book count: ${books.length}');
+      print('Final book count: ${books.length}, Total likes: $totalLikes');
+
+      // Update the author's total likes in the database
+      await _updateAuthorTotalLikes(totalLikes, books.length);
 
       if (!_disposed && mounted) {
         setState(() {
           authorBooks = books;
+          _currentTotalLikes = totalLikes;
+          _currentBookCount = books.length;
           _isLoading = false;
         });
       }
@@ -107,6 +144,46 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
           _errorMessage = 'Error loading books: ${e.toString()}';
         });
       }
+    }
+  }
+
+  Future<void> _updateAuthorTotalLikes(int totalLikes, int bookCount) async {
+    try {
+      print('Updating author ${widget.author.id} total likes to: $totalLikes');
+
+      // Update author's profile with current totals
+      Map<String, dynamic> authorUpdates = {
+        'totalLikes': totalLikes,
+        'likes': totalLikes,
+        'bookCount': bookCount,
+        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      // Update in multiple locations for consistency
+      List<Future> updateFutures = [
+        _database.child('users/${widget.author.id}/profile').update(authorUpdates),
+        _database.child('users/${widget.author.id}').update(authorUpdates),
+      ];
+
+      await Future.wait(updateFutures);
+      print('Author total likes updated successfully');
+    } catch (e) {
+      print('Error updating author total likes: $e');
+    }
+  }
+
+  Future<void> _refreshAuthorData() async {
+    print('Refreshing author data...');
+    await _loadAuthorBooks();
+
+    if (!_disposed && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Author data refreshed'),
+          duration: Duration(milliseconds: 500),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -148,7 +225,7 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
       ),
       child: Center(
         child: Text(
-          widget.author.name.isNotEmpty ? widget.author.name[0].toUpperCase() : '?',
+          _currentAuthorName.isNotEmpty ? _currentAuthorName[0].toUpperCase() : '?',
           style: TextStyle(
             color: Colors.white,
             fontSize: 32,
@@ -185,12 +262,12 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
     );
   }
 
-  void _navigateToBookDetail(Book book) {
+  void _navigateToBookDetail(Book book) async {
     // Convert all values to String as BookDetail expects Map<String, String>
     Map<String, String> bookData = {
       'id': book.id,
       'title': book.title,
-      'author': widget.author.name,
+      'author': _currentAuthorName,
       'description': book.description,
       'coverUrl': '', // BookDetail expects this field
       'status': book.status,
@@ -198,12 +275,17 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
       'createdAt': book.createdAt.toString(), // Convert to string
     };
 
-    // Use named route since you have it set up in main.dart
-    Navigator.pushNamed(
+    // Navigate and wait for result
+    final result = await Navigator.pushNamed(
       context,
       '/book_detail',
       arguments: bookData,
     );
+
+    // Refresh author books data when returning from book detail
+    // This ensures we see updated like counts
+    print('Returned from BookDetail, refreshing author books...');
+    await _loadAuthorBooks();
   }
 
   @override
@@ -213,13 +295,20 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
         title: Text('Author Details'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: _refreshAuthorData,
+            tooltip: 'Refresh author data',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Author Header
+            // Author Header - NOW USES DYNAMIC DATA
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -242,13 +331,13 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
                     ),
                     SizedBox(width: 20),
 
-                    // Author Info
+                    // Author Info - NOW USES DYNAMIC STATS
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.author.name,
+                            _currentAuthorName,
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -268,7 +357,7 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
                               Icon(Icons.book, size: 16, color: Theme.of(context).primaryColor),
                               SizedBox(width: 4),
                               Text(
-                                "${widget.author.bookCount} ${widget.author.bookCount == 1 ? 'book' : 'books'}",
+                                "$_currentBookCount ${_currentBookCount == 1 ? 'book' : 'books'}",
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -279,7 +368,7 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
                               Icon(Icons.favorite, size: 16, color: Colors.red),
                               SizedBox(width: 4),
                               Text(
-                                "${widget.author.likes} likes",
+                                "$_currentTotalLikes likes",
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[600],
@@ -396,7 +485,7 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
                             padding: EdgeInsets.all(8),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
                                   book.title,
@@ -406,6 +495,25 @@ class _AuthorDetailsPageState extends State<AuthorDetailsPage> {
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                                // Show likes count for each book
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.favorite,
+                                      size: 14,
+                                      color: Colors.red,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '${book.likesCount}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

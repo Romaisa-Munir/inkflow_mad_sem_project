@@ -69,16 +69,18 @@ class AuthorService {
             profileData = Map<String, dynamic>.from(userData['profile']);
           }
 
+          // Improved name resolution logic
+          String authorName = _resolveAuthorName(profileData, userData, userId);
+
           final author = AuthorModel.fromMap(userId, {
-            // Use profile data first, then fallback to root level data
-            'name': profileData['username'] ?? userData['name'] ?? userData['displayName'],
-            'email': userData['email'],
+            'name': authorName,
+            'email': userData['email'] ?? '',
             'profileImageUrl': profileData['profilePicBase64'] != null
                 ? 'data:image/jpeg;base64,${profileData['profilePicBase64']}'
                 : userData['profileImageUrl'],
             'joinedDate': userData['createdAt'] != null
                 ? DateTime.parse(userData['createdAt']).millisecondsSinceEpoch
-                : userData['joinedDate'],
+                : userData['joinedDate'] ?? DateTime.now().millisecondsSinceEpoch,
             'followers': userData['followers'] ?? 0,
             'likes': totalLikes, // Use calculated total likes
             'isAuthor': true,
@@ -104,6 +106,47 @@ class AuthorService {
       print('Error fetching authors: $e');
       return [];
     }
+  }
+
+  /// Helper method to resolve the best author name from available data
+  static String _resolveAuthorName(Map<String, dynamic> profileData, Map<String, dynamic> userData, String userId) {
+    String? name;
+
+    // First priority: profile username (if set and not default)
+    name = profileData['username'];
+    if (name != null && name.isNotEmpty && name != 'Your Username') {
+      return name;
+    }
+
+    // Second priority: profile name
+    name = profileData['name'];
+    if (name != null && name.isNotEmpty && name != 'Your Username') {
+      return name;
+    }
+
+    // Third priority: user data name
+    name = userData['name'];
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+
+    // Fourth priority: user data displayName
+    name = userData['displayName'];
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+
+    // Fifth priority: email prefix (if email exists)
+    String? email = userData['email'];
+    if (email != null && email.isNotEmpty) {
+      String emailPrefix = email.split('@')[0];
+      if (emailPrefix.isNotEmpty) {
+        return emailPrefix;
+      }
+    }
+
+    // Last resort: generate a user-friendly name
+    return 'Author${userId.substring(0, 6)}';
   }
 
   /// Helper method to get likes count for a specific book

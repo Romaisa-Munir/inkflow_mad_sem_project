@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
   HomeScreenState createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Real data from Firebase
   List<Book> allBooks = [];
   List<Book> filteredBooks = [];
@@ -31,15 +31,26 @@ class HomeScreenState extends State<HomeScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadData();
+  }
+
+  @override
   void dispose() {
     _disposed = true;
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadData();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh data when app comes back to foreground
+    if (state == AppLifecycleState.resumed && !_disposed) {
+      print('App resumed, refreshing data...');
+      _loadAllAuthors(); // Refresh authors to get latest likes
+    }
   }
 
   Future<void> _loadData() async {
@@ -100,6 +111,7 @@ class HomeScreenState extends State<HomeScreen> {
                     authorId: userId, // Use the userId from the loop, not from bookMap
                     createdAt: bookMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
                     status: bookMap['status'] ?? 'draft',
+                    likesCount: bookMap['likesCount'] ?? 0, // Include likes count
                   );
                   books.add(book);
                   print('Added book: ${book.title} with authorId: ${book.authorId}');
@@ -142,6 +154,7 @@ class HomeScreenState extends State<HomeScreen> {
       print('Error loading authors: $e');
     }
   }
+
   // Helper method to load book directly if not found in allBooks
   Future<void> _loadBookDirectly(String bookId, List<Book> libraryBooks) async {
     try {
@@ -170,6 +183,7 @@ class HomeScreenState extends State<HomeScreen> {
                 authorId: userId,
                 createdAt: bookData['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
                 status: bookData['status'] ?? 'published',
+                likesCount: bookData['likesCount'] ?? 0,
               );
 
               libraryBooks.add(book);
@@ -185,8 +199,8 @@ class HomeScreenState extends State<HomeScreen> {
       print('Error loading book $bookId directly: $e');
     }
   }
-//Changes from warda: Had to make tiny changes in this function, to maintain user's login session.
 
+  //Changes from warda: Had to make tiny changes in this function, to maintain user's login session.
   Future<void> _loadUserLibrary() async {
     try {
       User? currentUser = _auth.currentUser;
@@ -247,6 +261,7 @@ class HomeScreenState extends State<HomeScreen> {
       }
     }
   }
+
   // Add refresh method for the refresh button
   Future<void> _refreshData() async {
     // Show loading snackbar
@@ -283,6 +298,32 @@ class HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // Enhanced refresh method that focuses on authors
+  Future<void> _refreshAuthorsOnly() async {
+    try {
+      print('Refreshing authors data...');
+      await _loadAllAuthors();
+
+      if (!_disposed && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Author data refreshed'),
+            duration: Duration(milliseconds: 500),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error refreshing authors: $e');
+    }
+  }
+
+  // Add a pull-to-refresh for the entire page
+  Future<void> _onRefresh() async {
+    await _loadData();
+  }
+
   void searchAll(String query) {
     if (_disposed) return; // Check if disposed
 
@@ -356,8 +397,8 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Navigate to book detail (you'll need to update this to work with Book)
-  void _navigateToBookDetail(Book book) {
+  // Navigate to book detail with refresh on return
+  void _navigateToBookDetail(Book book) async {
     // Convert Book to the format your BookDetail expects
     Map<String, String> bookData = {
       'id': book.id,
@@ -372,12 +413,47 @@ class HomeScreenState extends State<HomeScreen> {
 
     print('Navigating to book detail with authorId: ${book.authorId}');
 
-    Navigator.push(
+    // Wait for the result from BookDetail page
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => BookDetail(book: bookData),
       ),
     );
+
+    // Refresh data when returning to ensure likes are updated
+    print('Returned from BookDetail, refreshing data...');
+    await Future.wait([
+      _loadAllBooks(),
+      _loadAllAuthors(),
+    ]);
+  }
+
+  // Add a method to handle navigation to author details
+  Future<void> _navigateToAuthorDetails(AuthorModel author) async {
+    print('Navigating to author details for: ${author.name}');
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AuthorDetailsPage(author: author),
+      ),
+    );
+
+    // Always refresh author data when returning
+    print('Returned from AuthorDetailsPage, refreshing author data...');
+    await _loadAllAuthors();
+
+    // Optional: Show a brief loading indicator
+    if (!_disposed && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Updated author data'),
+          duration: Duration(milliseconds: 800),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   @override
@@ -410,228 +486,230 @@ class HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _loadData,
+            onPressed: _refreshData,
+            tooltip: 'Refresh all data',
+          ),
+          // Add a specific button to refresh just authors
+          IconButton(
+            icon: Icon(Icons.people_outline),
+            onPressed: _refreshAuthorsOnly,
+            tooltip: 'Refresh authors',
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            SizedBox(height: 20),
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              SizedBox(height: 20),
 
-            // Search Bar
-            Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: StandardSearchBar(
-                  width: double.infinity,
-                  horizontalPadding: 10,
-                  onChanged: searchAll,
-                )
-            ),
-
-            // 'Books' Title with "See All" option
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("Books", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/all_books');
-                    },
-                    child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
+              // Search Bar
+              Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: StandardSearchBar(
+                    width: double.infinity,
+                    horizontalPadding: 10,
+                    onChanged: searchAll,
                   )
-                ],
               ),
-            ),
 
-            // Book Section - horizontal scrollable
-            SizedBox(
-              height: 240,
-              child: filteredBooks.isEmpty
-                  ? Center(
-                child: Text(
-                  'No books available yet',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              // 'Books' Title with "See All" option
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Books", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/all_books');
+                      },
+                      child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
+                    )
+                  ],
                 ),
-              )
-                  : ListView.builder(
-                itemCount: filteredBooks.length,
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                itemBuilder: (context, index) {
-                  final book = filteredBooks[index];
-                  return GestureDetector(
+              ),
+
+              // Book Section - horizontal scrollable
+              SizedBox(
+                height: 240,
+                child: filteredBooks.isEmpty
+                    ? Center(
+                  child: Text(
+                    'No books available yet',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                )
+                    : ListView.builder(
+                  itemCount: filteredBooks.length,
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  itemBuilder: (context, index) {
+                    final book = filteredBooks[index];
+                    return GestureDetector(
+                        onTap: () => _navigateToBookDetail(book),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Book Cover
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: _buildBookCover(book),
+                              ),
+                              SizedBox(height: 5),
+                              // Book Title
+                              Container(
+                                width: 150,
+                                height: 35,
+                                child: Text(
+                                  book.title,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                    );
+                  },
+                ),
+              ),
+
+              // 'My Library' section
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("My Library", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/library');
+                      },
+                      child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
+                    )
+                  ],
+                ),
+              ),
+
+              // My Library (horizontally scrollable)
+              Container(
+                height: 160,
+                margin: EdgeInsets.only(bottom: 5),
+                child: userLibraryBooks.isEmpty
+                    ? Center(
+                  child: Text(
+                    'Your library is empty',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                )
+                    : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: userLibraryBooks.length,
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  itemBuilder: (context, index) {
+                    final book = userLibraryBooks[index];
+                    return GestureDetector(
                       onTap: () => _navigateToBookDetail(book),
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        padding: EdgeInsets.all(8),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Book Cover
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: _buildBookCover(book),
+                              child: _buildBookCover(book, width: 100, height: 120),
                             ),
                             SizedBox(height: 5),
-                            // Book Title
                             Container(
-                              width: 150,
-                              height: 35,
+                              width: 100,
                               child: Text(
                                 book.title,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                style: TextStyle(fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
+                                maxLines: 1,
                               ),
                             ),
                           ],
                         ),
-                      )
-                  );
-                },
-              ),
-            ),
-
-            // 'My Library' section
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("My Library", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/library');
-                    },
-                    child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
-                  )
-                ],
-              ),
-            ),
-
-            // My Library (horizontally scrollable)
-            Container(
-              height: 160,
-              margin: EdgeInsets.only(bottom: 5),
-              child: userLibraryBooks.isEmpty
-                  ? Center(
-                child: Text(
-                  'Your library is empty',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-              )
-                  : ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: userLibraryBooks.length,
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                itemBuilder: (context, index) {
-                  final book = userLibraryBooks[index];
-                  return GestureDetector(
-                    onTap: () => _navigateToBookDetail(book),
-                    child: Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: _buildBookCover(book, width: 100, height: 120),
-                          ),
-                          SizedBox(height: 5),
-                          Container(
-                            width: 100,
-                            child: Text(
-                              book.title,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // 'Authors' title with "See All" option
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("Authors", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/all_authors');
-                    },
-                    child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
-                  )
-                ],
-              ),
-            ),
-
-            // Author Section
-            Container(
-              height: 80,
-              margin: EdgeInsets.only(bottom: 20),
-              child: filteredAuthors.isEmpty
-                  ? Center(
-                child: Text(
-                  'No authors available yet',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    );
+                  },
                 ),
-              )
-                  : ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: filteredAuthors.length,
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                itemBuilder: (context, index) {
-                  final author = filteredAuthors[index];
-                  return GestureDetector( // Add this GestureDetector
-                    onTap: () {
-                      // Navigate to author details page
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AuthorDetailsPage(author: author),
+              ),
+
+              // 'Authors' title with "See All" option
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Authors", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/all_authors');
+                      },
+                      child: Text("See All", style: TextStyle(color: Colors.deepPurple)),
+                    )
+                  ],
+                ),
+              ),
+
+              // Author Section with updated navigation
+              Container(
+                height: 80,
+                margin: EdgeInsets.only(bottom: 20),
+                child: filteredAuthors.isEmpty
+                    ? Center(
+                  child: Text(
+                    'No authors available yet',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                )
+                    : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: filteredAuthors.length,
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  itemBuilder: (context, index) {
+                    final author = filteredAuthors[index];
+                    return GestureDetector(
+                      onTap: () => _navigateToAuthorDetails(author),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildAuthorAvatar(author),
+                            SizedBox(height: 4),
+                            Container(
+                              width: 70,
+                              child: Text(
+                                author.name,
+                                style: TextStyle(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildAuthorAvatar(author),
-                          SizedBox(height: 4),
-                          Container(
-                            width: 70,
-                            child: Text(
-                              author.name,
-                              style: TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
 
-      // Bottom Nav Bar
       // Bottom Nav Bar
       //From Warda: Made changes in navigation. Navigation flow remains same, had navigation issues so had to edit code for proper navigation
       bottomNavigationBar: BottomNavigationBar(

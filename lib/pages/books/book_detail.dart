@@ -62,36 +62,76 @@ class _BookDetailState extends State<BookDetail> {
 
       print('Loading author details for authorId: $authorId');
 
+      String? authorName;
+
       // Try loading from profile first
-      DatabaseEvent authorEvent = await _database
+      DatabaseEvent profileEvent = await _database
           .child('users/$authorId/profile')
           .once();
 
-      if (authorEvent.snapshot.exists && authorEvent.snapshot.value != null) {
-        Map<dynamic, dynamic> authorData = authorEvent.snapshot.value as Map<dynamic, dynamic>;
-        setState(() {
-          _authorName = authorData['name'] ?? widget.book['author'];
-        });
-        print('Author name loaded from profile: $_authorName');
-      } else {
-        // Try loading from root user data
+      if (profileEvent.snapshot.exists && profileEvent.snapshot.value != null) {
+        Map<dynamic, dynamic> profileData = profileEvent.snapshot.value as Map<dynamic, dynamic>;
+
+        // Check for username in profile (this is the main field we want)
+        authorName = profileData['username'];
+
+        // If username is null, empty, or still default, try other profile fields
+        if (authorName == null || authorName.isEmpty || authorName == 'Your Username') {
+          authorName = profileData['name'];
+        }
+
+        print('Profile data found: $profileData');
+        print('Extracted author name from profile: $authorName');
+      }
+
+      // If no good name from profile, try root level user data
+      if (authorName == null || authorName.isEmpty || authorName == 'Your Username') {
         DatabaseEvent userEvent = await _database
             .child('users/$authorId')
             .once();
 
         if (userEvent.snapshot.exists && userEvent.snapshot.value != null) {
           Map<dynamic, dynamic> userData = userEvent.snapshot.value as Map<dynamic, dynamic>;
-          setState(() {
-            _authorName = userData['profile']?['name'] ?? userData['name'] ?? widget.book['author'];
-          });
-          print('Author name loaded from user data: $_authorName');
-        } else {
-          setState(() {
-            _authorName = widget.book['author'] ?? 'Unknown Author';
-          });
-          print('Author data not found, using fallback name');
+
+          // Try various fields in order of preference
+          authorName = userData['name'] ??
+              userData['displayName'] ??
+              userData['username'];
+
+          print('User data found, extracted name: $authorName');
         }
       }
+
+      // If still no good name, create a user-friendly fallback
+      if (authorName == null || authorName.isEmpty || authorName == 'Your Username') {
+        // Get user's email to create a better fallback
+        DatabaseEvent userEvent = await _database
+            .child('users/$authorId')
+            .once();
+
+        String? email;
+        if (userEvent.snapshot.exists && userEvent.snapshot.value != null) {
+          Map<dynamic, dynamic> userData = userEvent.snapshot.value as Map<dynamic, dynamic>;
+          email = userData['email'];
+        }
+
+        if (email != null && email.isNotEmpty) {
+          // Use email prefix as fallback (e.g., "john.doe@example.com" -> "john.doe")
+          authorName = email.split('@')[0];
+          print('Using email prefix as author name: $authorName');
+        } else {
+          // Last resort: use the book's author field or generic name
+          authorName = widget.book['author'] ?? 'Author';
+          print('Using fallback author name: $authorName');
+        }
+      }
+
+      setState(() {
+        _authorName = authorName;
+      });
+
+      print('Final author name set: $_authorName');
+
     } catch (e) {
       print('Error loading author details: $e');
       setState(() {
@@ -225,6 +265,7 @@ class _BookDetailState extends State<BookDetail> {
     }
   }
 
+// Replace the _toggleLike method in BookDetail
   Future<void> _toggleLike() async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) {
@@ -272,9 +313,13 @@ class _BookDetailState extends State<BookDetail> {
         print('Like added, new count: $_likesCount');
       }
 
-      // Update author's total likes
-      print('Updating author total likes...');
-      await _updateAuthorLikes();
+      // Update the book's likesCount in the author's collection immediately
+      await _database
+          .child('users/$authorId/books/$bookId/likesCount')
+          .set(_likesCount);
+
+      // Update author's total likes immediately (this is the key fix)
+      await _updateAuthorLikesImmediately(authorId);
 
       _showMessage(_isLiked ? 'Liked!' : 'Like removed');
 
@@ -288,15 +333,10 @@ class _BookDetailState extends State<BookDetail> {
     }
   }
 
-  Future<void> _updateAuthorLikes() async {
+// New method for immediate author likes update
+  Future<void> _updateAuthorLikesImmediately(String authorId) async {
     try {
-      String? authorId = widget.book['authorId'];
-      if (authorId == null || authorId == 'null') {
-        print('Cannot update author likes: authorId is null');
-        return;
-      }
-
-      print('Updating author likes for authorId: $authorId');
+      print('Immediately updating author total likes for authorId: $authorId');
 
       // Get all books by this author
       DatabaseEvent authorBooksEvent = await _database
@@ -304,10 +344,12 @@ class _BookDetailState extends State<BookDetail> {
           .once();
 
       int totalLikes = 0;
+      int totalBooks = 0;
 
       if (authorBooksEvent.snapshot.exists && authorBooksEvent.snapshot.value != null) {
         Map<dynamic, dynamic> booksData = authorBooksEvent.snapshot.value as Map<dynamic, dynamic>;
-        print('Found ${booksData.length} books for author');
+        totalBooks = booksData.length;
+        print('Found $totalBooks books for author');
 
         // Count likes for each book
         for (String bookId in booksData.keys) {
@@ -317,41 +359,50 @@ class _BookDetailState extends State<BookDetail> {
 
           if (bookLikesEvent.snapshot.exists && bookLikesEvent.snapshot.value != null) {
             Map<dynamic, dynamic> likesData = bookLikesEvent.snapshot.value as Map<dynamic, dynamic>;
-            totalLikes += likesData.length;
-            print('Book $bookId has ${likesData.length} likes');
+            int bookLikes = likesData.length;
+            totalLikes += bookLikes;
+            print('Book $bookId has $bookLikes likes');
+
+            // Update the book's likesCount in the author's books collection
+            await _database
+                .child('users/$authorId/books/$bookId/likesCount')
+                .set(bookLikes);
           }
         }
       }
 
-      print('Total likes for author: $totalLikes');
+      print('Total likes across all books for author: $totalLikes');
 
-      // Update author's profile with total likes - try multiple locations
+      // Update author's profile with total likes and book count in multiple locations
+      Map<String, dynamic> authorUpdates = {
+        'totalLikes': totalLikes,
+        'likes': totalLikes, // Keep both for compatibility
+        'bookCount': totalBooks,
+        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      // Update in multiple locations simultaneously for immediate effect
       List<Future> updateFutures = [
         _database.child('users/$authorId/profile/totalLikes').set(totalLikes),
         _database.child('users/$authorId/profile/likes').set(totalLikes),
         _database.child('users/$authorId/totalLikes').set(totalLikes),
         _database.child('users/$authorId/likes').set(totalLikes),
+        _database.child('users/$authorId/profile').update(authorUpdates),
+        _database.child('users/$authorId').update(authorUpdates),
       ];
 
       await Future.wait(updateFutures);
 
-      print('Author likes updated in multiple locations');
+      print('Author stats immediately updated: $totalLikes likes, $totalBooks books');
 
-      // Verify the update worked
-      DatabaseEvent verifyEvent = await _database
-          .child('users/$authorId/profile')
-          .once();
-
-      if (verifyEvent.snapshot.exists && verifyEvent.snapshot.value != null) {
-        Map<dynamic, dynamic> profileData = verifyEvent.snapshot.value as Map<dynamic, dynamic>;
-        print('Verified profile data after update: ${profileData}');
-      }
+      // Force refresh of any cached author data by triggering a database listener
+      // This ensures the Authors page will see the updated data immediately
+      await _database.child('users/$authorId/lastLikeUpdate').set(DateTime.now().millisecondsSinceEpoch);
 
     } catch (e) {
-      print('Error updating author likes: $e');
+      print('Error immediately updating author likes: $e');
     }
   }
-
   Future<void> _toggleLibrary() async {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) {
