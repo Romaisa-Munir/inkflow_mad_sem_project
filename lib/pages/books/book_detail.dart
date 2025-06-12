@@ -168,20 +168,35 @@ class _BookDetailState extends State<BookDetail> {
 
   Future<void> _loadLikesCount() async {
     try {
+      String? authorId = widget.book['authorId'];
+      String? bookId = widget.book['id'];
+
+      if (authorId == null || authorId == 'null' || bookId == null) {
+        print('Invalid authorId ($authorId) or bookId ($bookId)');
+        return;
+      }
+
+      // Load likes count from the book's likes node
       DatabaseEvent likesEvent = await _database
-          .child('books/${widget.book['id']}/likes')
+          .child('books/$bookId/likes')
           .once();
 
+      int likesCount = 0;
       if (likesEvent.snapshot.exists && likesEvent.snapshot.value != null) {
         Map<dynamic, dynamic> likesData = likesEvent.snapshot.value as Map<dynamic, dynamic>;
-        setState(() {
-          _likesCount = likesData.length;
-        });
+        likesCount = likesData.length;
       }
+
+      setState(() {
+        _likesCount = likesCount;
+      });
+
+      print('Loaded likes count for book $bookId: $likesCount');
     } catch (e) {
       print('Error loading likes count: $e');
     }
   }
+
 
   Future<void> _checkUserInteractions() async {
     User? currentUser = _auth.currentUser;

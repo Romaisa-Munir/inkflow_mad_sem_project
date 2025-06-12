@@ -28,14 +28,42 @@ class AuthorService {
 
         // Check if user has books (making them an author)
         int bookCount = 0;
+        int totalLikes = 0;
+
         if (userData['books'] != null) {
           final Map<dynamic, dynamic> books = userData['books'];
           bookCount = books.length;
+
+          // Calculate total likes across all books for this author
+          for (var bookEntry in books.entries) {
+            final String bookId = bookEntry.key;
+            final Map<String, dynamic> bookData = Map<String, dynamic>.from(bookEntry.value);
+
+            // Get likes count for this specific book
+            int bookLikes = await _getBookLikesCount(bookId);
+            totalLikes += bookLikes;
+
+            // Update the book's likesCount in the author's collection if it's outdated
+            if (bookData['likesCount'] != bookLikes) {
+              await _database
+                  .child('users/$userId/books/$bookId/likesCount')
+                  .set(bookLikes);
+            }
+          }
+
+          // Update author's total likes if it's different
+          int storedLikes = userData['totalLikes'] ?? userData['likes'] ?? 0;
+          if (storedLikes != totalLikes) {
+            await _database.child('users/$userId').update({
+              'totalLikes': totalLikes,
+              'likes': totalLikes,
+            });
+          }
         }
 
         // Only include users who have created at least one book
         if (bookCount > 0) {
-          // Extract profile data if it exists (matching your ProfilePage structure)
+          // Extract profile data if it exists
           Map<String, dynamic> profileData = {};
           if (userData['profile'] != null) {
             profileData = Map<String, dynamic>.from(userData['profile']);
@@ -52,7 +80,7 @@ class AuthorService {
                 ? DateTime.parse(userData['createdAt']).millisecondsSinceEpoch
                 : userData['joinedDate'],
             'followers': userData['followers'] ?? 0,
-            'likes': userData['likes'] ?? 0,
+            'likes': totalLikes, // Use calculated total likes
             'isAuthor': true,
             'bookCount': bookCount,
           });
@@ -60,10 +88,14 @@ class AuthorService {
         }
       }
 
-      // Sort authors by book count (most prolific first), then by name
+      // Sort authors by total likes first, then by book count, then by name
       authors.sort((a, b) {
+        final likesComparison = b.likes.compareTo(a.likes);
+        if (likesComparison != 0) return likesComparison;
+
         final bookCountComparison = b.bookCount.compareTo(a.bookCount);
         if (bookCountComparison != 0) return bookCountComparison;
+
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
 
@@ -71,6 +103,71 @@ class AuthorService {
     } catch (e) {
       print('Error fetching authors: $e');
       return [];
+    }
+  }
+
+  /// Helper method to get likes count for a specific book
+  static Future<int> _getBookLikesCount(String bookId) async {
+    try {
+      final DatabaseEvent likesEvent = await _database
+          .child('books/$bookId/likes')
+          .once();
+
+      if (likesEvent.snapshot.exists && likesEvent.snapshot.value != null) {
+        final Map<dynamic, dynamic> likesData = likesEvent.snapshot.value as Map<dynamic, dynamic>;
+        return likesData.length;
+      }
+      return 0;
+    } catch (e) {
+      print('Error getting likes count for book $bookId: $e');
+      return 0;
+    }
+  }
+
+  /// Recalculates and updates an author's total likes
+  static Future<void> recalculateAuthorLikes(String authorId) async {
+    try {
+      print('Recalculating likes for author: $authorId');
+
+      // Get all books by this author
+      final DatabaseEvent authorBooksEvent = await _database
+          .child('users/$authorId/books')
+          .once();
+
+      int totalLikes = 0;
+      int totalBooks = 0;
+
+      if (authorBooksEvent.snapshot.exists && authorBooksEvent.snapshot.value != null) {
+        final Map<dynamic, dynamic> booksData = authorBooksEvent.snapshot.value as Map<dynamic, dynamic>;
+        totalBooks = booksData.length;
+
+        // Count likes for each book
+        for (String bookId in booksData.keys) {
+          int bookLikes = await _getBookLikesCount(bookId);
+          totalLikes += bookLikes;
+
+          // Update the book's likesCount in the author's books collection
+          await _database
+              .child('users/$authorId/books/$bookId/likesCount')
+              .set(bookLikes);
+        }
+      }
+
+      // Update author's profile with calculated totals
+      Map<String, dynamic> authorUpdates = {
+        'totalLikes': totalLikes,
+        'likes': totalLikes,
+        'bookCount': totalBooks,
+        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      await _database.child('users/$authorId/profile').update(authorUpdates);
+      await _database.child('users/$authorId').update(authorUpdates);
+
+      print('Author $authorId updated: $totalLikes total likes across $totalBooks books');
+    } catch (e) {
+      print('Error recalculating author likes: $e');
+      rethrow;
     }
   }
 
@@ -104,6 +201,9 @@ class AuthorService {
           currentUser.email?.split('@')[0] ??
           'Author${userId.substring(0, 6)}';
 
+      // Calculate current total likes
+      int totalLikes = await _calculateUserTotalLikes(userId);
+
       // Only update if the user doesn't already have a username set
       Map<String, dynamic> authorData = {};
 
@@ -115,7 +215,8 @@ class AuthorService {
       authorData.addAll({
         'email': userData['email'] ?? currentUser.email ?? '',
         'followers': userData['followers'] ?? 0,
-        'likes': userData['likes'] ?? 0,
+        'likes': totalLikes,
+        'totalLikes': totalLikes,
         'isAuthor': true,
         'lastActive': DateTime.now().millisecondsSinceEpoch,
       });
@@ -125,10 +226,33 @@ class AuthorService {
         await userRef.update(authorData);
       }
 
-      print('Author profile updated successfully');
+      print('Author profile updated successfully with $totalLikes total likes');
     } catch (e) {
       print('Error updating author profile: $e');
       rethrow;
+    }
+  }
+
+  /// Calculate total likes across all books for a user
+  static Future<int> _calculateUserTotalLikes(String userId) async {
+    try {
+      final DatabaseEvent booksEvent = await _database
+          .child('users/$userId/books')
+          .once();
+
+      int totalLikes = 0;
+      if (booksEvent.snapshot.exists && booksEvent.snapshot.value != null) {
+        final Map<dynamic, dynamic> books = booksEvent.snapshot.value as Map<dynamic, dynamic>;
+
+        for (String bookId in books.keys) {
+          totalLikes += await _getBookLikesCount(bookId);
+        }
+      }
+
+      return totalLikes;
+    } catch (e) {
+      print('Error calculating user total likes: $e');
+      return 0;
     }
   }
 
@@ -149,9 +273,14 @@ class AuthorService {
         bookCount = books.length;
       }
 
-      // Update book count and timestamp
+      // Calculate total likes
+      int totalLikes = await _calculateUserTotalLikes(userId);
+
+      // Update book count, likes, and timestamp
       await userRef.update({
         'bookCount': bookCount,
+        'totalLikes': totalLikes,
+        'likes': totalLikes,
         'lastBookCreated': DateTime.now().millisecondsSinceEpoch,
         'lastActive': DateTime.now().millisecondsSinceEpoch,
       });
@@ -232,5 +361,4 @@ class AuthorService {
       return false;
     }
   }
-
 }
