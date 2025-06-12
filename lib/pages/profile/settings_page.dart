@@ -139,6 +139,55 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // Logout function
+  Future<void> _logout() async {
+    try {
+      // Show confirmation dialog
+      bool? confirmLogout = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Logout'),
+          content: Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('Logout', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmLogout == true) {
+        // Sign out from Firebase
+        await _auth.signOut();
+
+        // Navigate to root and let AuthWrapper handle the redirect
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/',
+              (route) => false,
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logged out successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error logging out: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   // Validate user inputs
   bool _validateInputs() {
     // Email validation
@@ -208,6 +257,14 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         title: Text("Settings"),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          // Logout button in app bar
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Logout',
+          ),
+        ],
       ),
       body: _isInitializing
           ? Center(child: CircularProgressIndicator())
@@ -278,6 +335,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
                   : Text("Save Settings"),
+            ),
+            SizedBox(height: 16),
+            // Alternative logout button in the body (optional)
+            OutlinedButton.icon(
+              onPressed: _logout,
+              icon: Icon(Icons.logout, color: Colors.red),
+              label: Text("Logout", style: TextStyle(color: Colors.red)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.red),
+              ),
             ),
           ],
         ),

@@ -137,6 +137,7 @@ class HomeScreenState extends State<HomeScreen> {
       print('Error loading authors: $e');
     }
   }
+//Changes from warda: Had to make tiny changes in this function, to maintain user's login session.
 
   Future<void> _loadUserLibrary() async {
     try {
@@ -155,14 +156,14 @@ class HomeScreenState extends State<HomeScreen> {
 
         // Get book details for each book in library
         for (String bookId in libraryData.keys) {
-          // Find the book in allBooks or fetch it
-          Book? book = allBooks.firstWhere(
-                (b) => b.id == bookId,
-            orElse: () => null as Book,
-          );
-
-          if (book != null) {
+          // Find the book in allBooks - use try/catch approach instead of orElse
+          try {
+            Book? book = allBooks.firstWhere((b) => b.id == bookId);
             libraryBooks.add(book);
+          } catch (e) {
+            // Book not found in allBooks, skip it
+            print('Book with id $bookId not found in allBooks');
+            continue;
           }
         }
       }
@@ -505,6 +506,8 @@ class HomeScreenState extends State<HomeScreen> {
       ),
 
       // Bottom Nav Bar
+      // Bottom Nav Bar
+      //From Warda: Made changes in navigation. Navigation flow remains same, had navigation issues so had to edit code for proper navigation
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         items: [
@@ -520,16 +523,16 @@ class HomeScreenState extends State<HomeScreen> {
             return;
           }
           if (index == 1) {
-            Navigator.pushReplacement(
+            Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => WritingDashboard()),
             );
           }
           if (index == 2) {
-            Navigator.pushReplacementNamed(context, '/library');
+            Navigator.pushNamed(context, '/library');
           }
           if (index == 3) {
-            Navigator.pushReplacement(
+            Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => ProfilePage()),
             );

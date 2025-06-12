@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:inkflow_mad_sem_project/pages/authors/authors_page.dart';
 import 'package:inkflow_mad_sem_project/pages/books/book_detail.dart';
@@ -33,9 +34,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'InkFlow',
-      initialRoute: '/login',
+      // Remove initialRoute and use home instead
+      home: AuthWrapper(),
       routes: {
-        '/': (context) => HomeScreen(),
         '/library': (context) => Library(),
         '/all_books': (context) => Books(),
         '/all_authors': (context) => Authors(),
@@ -53,6 +54,36 @@ class MyApp extends StatelessWidget {
           default:
             return null;
         }
+      },
+    );
+  }
+}
+
+// New AuthWrapper widget to handle authentication state
+class AuthWrapper extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading indicator while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        // If user is logged in, show home screen
+        if (snapshot.hasData && snapshot.data != null) {
+          print("User is logged in: ${snapshot.data!.email}");
+          return HomeScreen();
+        }
+
+        // If no user is logged in, show login screen
+        print("No user logged in, showing login screen");
+        return LoginScreen();
       },
     );
   }
