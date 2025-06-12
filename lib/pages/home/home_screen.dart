@@ -50,12 +50,15 @@ class HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Load all books and authors concurrently
+      // Load books and authors first
       await Future.wait([
         _loadAllBooks(),
         _loadAllAuthors(),
-        _loadUserLibrary(),
       ]);
+
+      // Then load user library after books are loaded
+      await _loadUserLibrary();
+
     } catch (e) {
       print('Error loading data: $e');
     }
@@ -94,11 +97,12 @@ class HomeScreenState extends State<HomeScreen> {
                     title: bookMap['title'] ?? 'Untitled',
                     description: bookMap['description'] ?? 'No description',
                     coverImage: bookMap['coverImage'],
-                    authorId: bookMap['authorId'] ?? userId,
+                    authorId: userId, // Use the userId from the loop, not from bookMap
                     createdAt: bookMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
                     status: bookMap['status'] ?? 'draft',
                   );
                   books.add(book);
+                  print('Added book: ${book.title} with authorId: ${book.authorId}');
                 } catch (e) {
                   print('Error parsing book $bookId: $e');
                 }
@@ -138,14 +142,67 @@ class HomeScreenState extends State<HomeScreen> {
       print('Error loading authors: $e');
     }
   }
+  // Helper method to load book directly if not found in allBooks
+  Future<void> _loadBookDirectly(String bookId, List<Book> libraryBooks) async {
+    try {
+      print('Searching for book $bookId directly in Firebase');
+
+      // Search through all users to find this book
+      DatabaseEvent usersEvent = await _database.child('users').once();
+
+      if (usersEvent.snapshot.exists && usersEvent.snapshot.value != null) {
+        Map<dynamic, dynamic> usersData = usersEvent.snapshot.value as Map<dynamic, dynamic>;
+
+        for (String userId in usersData.keys) {
+          Map<dynamic, dynamic> userData = usersData[userId];
+
+          if (userData['books'] != null) {
+            Map<dynamic, dynamic> userBooks = userData['books'];
+
+            if (userBooks.containsKey(bookId)) {
+              Map<String, dynamic> bookData = Map<String, dynamic>.from(userBooks[bookId]);
+
+              Book book = Book(
+                id: bookData['id'] ?? bookId,
+                title: bookData['title'] ?? 'Untitled',
+                description: bookData['description'] ?? 'No description',
+                coverImage: bookData['coverImage'],
+                authorId: userId,
+                createdAt: bookData['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+                status: bookData['status'] ?? 'published',
+              );
+
+              libraryBooks.add(book);
+              print('Found and added book directly: ${book.title}');
+              return;
+            }
+          }
+        }
+      }
+
+      print('Book $bookId not found anywhere');
+    } catch (e) {
+      print('Error loading book $bookId directly: $e');
+    }
+  }
 //Changes from warda: Had to make tiny changes in this function, to maintain user's login session.
 
   Future<void> _loadUserLibrary() async {
     try {
       User? currentUser = _auth.currentUser;
-      if (currentUser == null) return;
+      if (currentUser == null) {
+        print('No user logged in, cannot load library');
+        if (!_disposed) {
+          setState(() {
+            userLibraryBooks = [];
+          });
+        }
+        return;
+      }
 
       List<Book> libraryBooks = [];
+
+      print('Loading library for user: ${currentUser.uid}');
 
       // Get user's library
       DatabaseEvent libraryEvent = await _database
@@ -154,19 +211,24 @@ class HomeScreenState extends State<HomeScreen> {
 
       if (libraryEvent.snapshot.exists && libraryEvent.snapshot.value != null) {
         Map<dynamic, dynamic> libraryData = libraryEvent.snapshot.value as Map<dynamic, dynamic>;
+        print('Found ${libraryData.length} books in user library');
 
         // Get book details for each book in library
         for (String bookId in libraryData.keys) {
-          // Find the book in allBooks - use try/catch approach instead of orElse
+          // Find the book in allBooks
+          Book? foundBook;
           try {
-            Book? book = allBooks.firstWhere((b) => b.id == bookId);
-            libraryBooks.add(book);
+            foundBook = allBooks.firstWhere((b) => b.id == bookId);
+            libraryBooks.add(foundBook);
+            print('Added library book: ${foundBook.title}');
           } catch (e) {
-            // Book not found in allBooks, skip it
-            print('Book with id $bookId not found in allBooks');
-            continue;
+            // Book not found in allBooks, try to load it directly
+            print('Book with id $bookId not found in allBooks, trying direct load');
+            await _loadBookDirectly(bookId, libraryBooks);
           }
         }
+      } else {
+        print('No library data found for user');
       }
 
       if (!_disposed) { // Check if disposed before setState
@@ -178,9 +240,49 @@ class HomeScreenState extends State<HomeScreen> {
       print('Loaded ${libraryBooks.length} library books');
     } catch (e) {
       print('Error loading user library: $e');
+      if (!_disposed) {
+        setState(() {
+          userLibraryBooks = [];
+        });
+      }
     }
   }
+  // Add refresh method for the refresh button
+  Future<void> _refreshData() async {
+    // Show loading snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            SizedBox(width: 16),
+            Text('Refreshing...'),
+          ],
+        ),
+        duration: Duration(seconds: 3),
+      ),
+    );
 
+    // Refresh all data
+    await _loadData();
+
+    // Show success message
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Refreshed successfully!'),
+        duration: Duration(seconds: 1),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
   void searchAll(String query) {
     if (_disposed) return; // Check if disposed
 
@@ -263,7 +365,12 @@ class HomeScreenState extends State<HomeScreen> {
       'author': book.authorId, // You might want to get the actual author name
       'description': book.description,
       'coverUrl': '', // You'll handle this in BookDetail
+      'authorId': book.authorId, // Make sure this is set correctly
+      'status': book.status,
+      'createdAt': book.createdAt.toString(),
     };
+
+    print('Navigating to book detail with authorId: ${book.authorId}');
 
     Navigator.push(
       context,
@@ -282,6 +389,13 @@ class HomeScreenState extends State<HomeScreen> {
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
           centerTitle: true,
           automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: Icon(Icons.refresh),
+              onPressed: isLoading ? null : _refreshData, // Disable when already loading
+              tooltip: 'Refresh all data',
+            ),
+          ],
         ),
         body: Center(child: CircularProgressIndicator()),
       );
