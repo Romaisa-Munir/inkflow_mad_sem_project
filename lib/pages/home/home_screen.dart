@@ -489,12 +489,6 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: _refreshData,
             tooltip: 'Refresh all data',
           ),
-          // Add a specific button to refresh just authors
-          IconButton(
-            icon: Icon(Icons.people_outline),
-            onPressed: _refreshAuthorsOnly,
-            tooltip: 'Refresh authors',
-          ),
         ],
       ),
       body: RefreshIndicator(

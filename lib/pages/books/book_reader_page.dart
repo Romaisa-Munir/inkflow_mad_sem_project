@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:inkflow_mad_sem_project/services/reading_analytics_service.dart';
+import 'package:inkflow_mad_sem_project/services/payment_service.dart';
+import 'package:inkflow_mad_sem_project/pages/payment/payment_dialog.dart';
+import 'package:inkflow_mad_sem_project/pages/profile/settings_page.dart';
 
 class BookReaderPage extends StatefulWidget {
   final List<Map<String, dynamic>> chapters;
   final String bookTitle;
-  final String? bookId;  // Add this line
+  final String? bookId;
+  final int initialChapterIndex; // Add this parameter
 
   const BookReaderPage({
     Key? key,
     required this.chapters,
     required this.bookTitle,
-    this.bookId,  // Add this line
+    this.bookId,
+    this.initialChapterIndex = 0, // Default to first chapter
   }) : super(key: key);
 
   @override
@@ -26,9 +31,17 @@ class _BookReaderPageState extends State<BookReaderPage> {
   String? _currentSessionId;
   String? _bookId;
 
+  // Payment-related state
+  Map<String, bool> _purchasedChapters = {};
+  bool _isLoadingPurchases = true;
+  String? _pendingPaymentMessage;
+
   @override
   void initState() {
     super.initState();
+
+    // Set initial chapter index
+    _currentChapterIndex = widget.initialChapterIndex;
 
     // Debug: Print original chapters before sorting
     print('=== ORIGINAL CHAPTERS BEFORE SORTING ===');
@@ -105,11 +118,268 @@ class _BookReaderPageState extends State<BookReaderPage> {
       print('=== STICKING WITH TITLE-BASED SORTING ===');
     }
 
+    // Ensure initial chapter index is valid
+    if (_currentChapterIndex >= _sortedChapters.length) {
+      _currentChapterIndex = 0;
+    }
+
+    // Initialize PageController with the initial chapter index
+    _pageController = PageController(initialPage: _currentChapterIndex);
+
     print('BookReaderPage initialized with ${_sortedChapters.length} chapters');
     print('Starting with chapter: ${_sortedChapters[_currentChapterIndex]['title']}');
 
-    // START READING TIME TRACKING
+    // Load purchased chapters and start reading session
+    _loadPurchasedChapters();
     _startReadingSession();
+
+    // Check for pending payment message
+    _checkPendingPaymentMessage();
+  }
+
+  // Load user's purchased chapters
+  void _loadPurchasedChapters() async {
+    if (widget.bookId == null) {
+      setState(() {
+        _isLoadingPurchases = false;
+      });
+      return;
+    }
+
+    try {
+      final purchasedChapterIds = await PaymentService.getUserPurchasedChapters(widget.bookId!);
+
+      setState(() {
+        _purchasedChapters.clear();
+        for (String chapterId in purchasedChapterIds) {
+          _purchasedChapters[chapterId] = true;
+        }
+        _isLoadingPurchases = false;
+      });
+
+      print('Loaded ${purchasedChapterIds.length} purchased chapters');
+    } catch (e) {
+      print('Error loading purchased chapters: $e');
+      setState(() {
+        _isLoadingPurchases = false;
+      });
+    }
+  }
+
+  // Check for pending payment success message
+  void _checkPendingPaymentMessage() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['paymentSuccess'] == true) {
+        _showPaymentSuccessMessage();
+      }
+    });
+  }
+
+  void _showPaymentSuccessMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Payment successful! Chapter unlocked.'),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // Check if chapter is accessible (free or purchased)
+  bool _isChapterAccessible(Map<String, dynamic> chapter) {
+    final price = (chapter['price'] ?? 0.0).toDouble();
+    if (price == 0.0) return true; // Free chapters
+
+    final chapterId = chapter['id']?.toString();
+    if (chapterId == null) return true;
+
+    return _purchasedChapters[chapterId] ?? false;
+  }
+
+  // Handle chapter access (payment flow)
+  Future<void> _handleChapterAccess(Map<String, dynamic> chapter) async {
+    final price = (chapter['price'] ?? 0.0).toDouble();
+    if (price == 0.0) return; // Free chapter, no payment needed
+
+    final chapterId = chapter['id']?.toString();
+    if (chapterId == null) return;
+
+    // Check if already purchased
+    if (_purchasedChapters[chapterId] == true) return;
+
+    try {
+      // Check if user has payment info
+      final hasPaymentInfo = await PaymentService.hasCompletePaymentInfo();
+
+      if (!hasPaymentInfo) {
+        _showPaymentInfoDialog(chapter);
+        return;
+      }
+
+      // Show payment dialog
+      _showPaymentDialog(chapter);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error checking payment info: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showPaymentInfoDialog(Map<String, dynamic> chapter) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.payment, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('Payment Setup Required'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'To purchase chapters, please set up your payment information first.',
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Text(
+                'You\'ll be redirected to your profile page to complete the payment setup.',
+                style: TextStyle(fontSize: 12, color: Colors.orange[700]),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              // Navigate to settings page with return route
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsPage(),
+                  settings: RouteSettings(
+                    arguments: {
+                      'returnRoute': '/book_reader',
+                      'returnArgs': {
+                        'paymentSuccess': true,
+                        'chapters': widget.chapters,
+                        'bookTitle': widget.bookTitle,
+                        'bookId': widget.bookId,
+                      },
+                    },
+                  ),
+                ),
+              );
+
+              // Reload purchased chapters when returning
+              if (result == true) {
+                _loadPurchasedChapters();
+                _showPaymentSuccessMessage();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Setup Payment'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentDialog(Map<String, dynamic> chapter) {
+    final price = (chapter['price'] ?? 0.0).toDouble();
+    final chapterTitle = chapter['title'] ?? 'Untitled Chapter';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PaymentDialog(
+        chapterTitle: chapterTitle,
+        price: price,
+        onPaymentSuccess: () async {
+          await _processPayment(chapter);
+        },
+        onNavigateToProfile: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => SettingsPage()),
+          );
+          if (result == true) {
+            _loadPurchasedChapters();
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _processPayment(Map<String, dynamic> chapter) async {
+    if (widget.bookId == null) return;
+
+    final chapterId = chapter['id']?.toString();
+    if (chapterId == null) return;
+
+    final price = (chapter['price'] ?? 0.0).toDouble();
+
+    try {
+      await PaymentService.purchaseChapter(widget.bookId!, chapterId, price);
+
+      setState(() {
+        _purchasedChapters[chapterId] = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Chapter purchased successfully!'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Add this new method after initState
@@ -152,6 +422,14 @@ class _BookReaderPageState extends State<BookReaderPage> {
 
   void _goToNextChapter() {
     if (_currentChapterIndex < _sortedChapters.length - 1) {
+      final nextChapter = _sortedChapters[_currentChapterIndex + 1];
+
+      // Check if next chapter is accessible
+      if (!_isChapterAccessible(nextChapter)) {
+        _handleChapterAccess(nextChapter);
+        return;
+      }
+
       setState(() {
         _currentChapterIndex++;
       });
@@ -254,6 +532,12 @@ class _BookReaderPageState extends State<BookReaderPage> {
   }
 
   Widget _buildChapterNavigation() {
+    final currentChapter = _sortedChapters[_currentChapterIndex];
+    final isCurrentAccessible = _isChapterAccessible(currentChapter);
+    final nextChapterAccessible = _currentChapterIndex < _sortedChapters.length - 1
+        ? _isChapterAccessible(_sortedChapters[_currentChapterIndex + 1])
+        : false;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       margin: EdgeInsets.symmetric(horizontal: 16),
@@ -287,16 +571,33 @@ class _BookReaderPageState extends State<BookReaderPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _sortedChapters[_currentChapterIndex]['title'] ?? 'Chapter ${_currentChapterIndex + 1}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _isDarkMode ? Colors.white : Colors.deepPurple,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (!isCurrentAccessible) ...[
+                      Icon(
+                        Icons.lock,
+                        size: 16,
+                        color: Colors.orange,
+                      ),
+                      SizedBox(width: 4),
+                    ],
+                    Flexible(
+                      child: Text(
+                        currentChapter['title'] ?? 'Chapter ${_currentChapterIndex + 1}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isCurrentAccessible
+                              ? (_isDarkMode ? Colors.white : Colors.deepPurple)
+                              : Colors.orange,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -306,16 +607,32 @@ class _BookReaderPageState extends State<BookReaderPage> {
                     color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
+                if (!isCurrentAccessible) ...[
+                  SizedBox(height: 4),
+                  Text(
+                    'PKR ${(currentChapter['price'] ?? 0.0).toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
 
           // Next Button
           _buildNavButton(
-            icon: Icons.arrow_forward_ios,
-            label: 'Next',
+            icon: _currentChapterIndex < _sortedChapters.length - 1 && !nextChapterAccessible
+                ? Icons.payment
+                : Icons.arrow_forward_ios,
+            label: _currentChapterIndex < _sortedChapters.length - 1 && !nextChapterAccessible
+                ? 'Buy'
+                : 'Next',
             isEnabled: _currentChapterIndex < _sortedChapters.length - 1,
             onPressed: _goToNextChapter,
+            isPurchase: _currentChapterIndex < _sortedChapters.length - 1 && !nextChapterAccessible,
           ),
         ],
       ),
@@ -327,6 +644,7 @@ class _BookReaderPageState extends State<BookReaderPage> {
     required String label,
     required bool isEnabled,
     required VoidCallback onPressed,
+    bool isPurchase = false,
   }) {
     return Container(
       width: 80,
@@ -334,7 +652,9 @@ class _BookReaderPageState extends State<BookReaderPage> {
         onPressed: isEnabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: isEnabled
-              ? (_isDarkMode ? Colors.deepPurple[300] : Colors.deepPurple)
+              ? (isPurchase
+              ? Colors.orange
+              : (_isDarkMode ? Colors.deepPurple[300] : Colors.deepPurple))
               : (_isDarkMode ? Colors.grey[700] : Colors.grey[300]),
           foregroundColor: isEnabled ? Colors.white : Colors.grey[500],
           shape: RoundedRectangleBorder(
@@ -359,6 +679,13 @@ class _BookReaderPageState extends State<BookReaderPage> {
   }
 
   Widget _buildChapterContent(Map<String, dynamic> chapter) {
+    final isAccessible = _isChapterAccessible(chapter);
+    final price = (chapter['price'] ?? 0.0).toDouble();
+
+    if (!isAccessible) {
+      return _buildLockedChapterContent(chapter, price);
+    }
+
     return Container(
       color: _isDarkMode ? Colors.grey[900] : Colors.white,
       child: SingleChildScrollView(
@@ -492,8 +819,152 @@ class _BookReaderPageState extends State<BookReaderPage> {
     );
   }
 
+  Widget _buildLockedChapterContent(Map<String, dynamic> chapter, double price) {
+    return Container(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Lock Icon
+              Container(
+                padding: EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.orange[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.lock,
+                  size: 64,
+                  color: Colors.orange[700],
+                ),
+              ),
+
+              SizedBox(height: 32),
+
+              // Chapter Title
+              Text(
+                chapter['title'] ?? 'Locked Chapter',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: _isDarkMode ? Colors.white : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              SizedBox(height: 16),
+
+              // Price Info
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Text(
+                  'PKR ${price.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 24),
+
+              // Description
+              Text(
+                'This chapter requires a one-time purchase to unlock. Once purchased, you\'ll have permanent access to read it anytime.',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _isDarkMode ? Colors.grey[300] : Colors.grey[600],
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              SizedBox(height: 32),
+
+              // Purchase Button
+              ElevatedButton.icon(
+                onPressed: () => _handleChapterAccess(chapter),
+                icon: Icon(Icons.payment),
+                label: Text('Purchase Chapter'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  elevation: 4,
+                ),
+              ),
+
+              SizedBox(height: 16),
+
+              // Demo Notice
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.blue[700],
+                      size: 16,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Demo payment - no real money charged',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingPurchases) {
+      return Scaffold(
+        backgroundColor: _isDarkMode ? Colors.grey[900] : Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Loading chapters...',
+                style: TextStyle(
+                  color: _isDarkMode ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _isDarkMode ? Colors.grey[900] : Colors.white,
       appBar: AppBar(
@@ -519,9 +990,7 @@ class _BookReaderPageState extends State<BookReaderPage> {
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: () {
-              setState(() {
-                // Refresh the current state
-              });
+              _loadPurchasedChapters();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Reader refreshed'),

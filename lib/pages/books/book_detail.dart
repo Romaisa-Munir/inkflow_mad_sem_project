@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'book_reader_page.dart';
 import 'package:inkflow_mad_sem_project/services/reading_analytics_service.dart';
+import 'chapter_list_page.dart';
+
 
 
 class BookDetail extends StatefulWidget {
@@ -26,6 +28,9 @@ class _BookDetailState extends State<BookDetail> {
   String? _authorName;
   String? _coverImageBase64;
   List<Map<String, dynamic>> _chapters = [];
+  bool _isDescriptionExpanded = false;
+  static const int _descriptionMaxLines = 10; // Show first 3 lines by default
+
 
   @override
   void initState() {
@@ -34,6 +39,20 @@ class _BookDetailState extends State<BookDetail> {
     print('Author ID: ${widget.book['authorId']}');
     _loadBookDetails();
     _checkUserInteractions();
+  }
+
+  bool _isDescriptionLong() {
+    final String description = widget.book['description']!;
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: description,
+        style: TextStyle(fontSize: 16, height: 1.5),
+      ),
+      maxLines: _descriptionMaxLines,
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout(maxWidth: MediaQuery.of(context).size.width - 32); // Account for padding
+    return textPainter.didExceedMaxLines;
   }
 
   Future<void> _loadBookDetails() async {
@@ -179,7 +198,8 @@ class _BookDetailState extends State<BookDetail> {
                 'id': chapterId,
                 'title': chapterData['title'] ?? 'Untitled Chapter',
                 'content': chapterData['content'] ?? '',
-                'order': chapterData['order'] ?? chapters.length, // Use index as fallback
+                'order': chapterData['order'] ?? chapters.length,
+                'price': (chapterData['price'] ?? 0.0).toDouble(),
               };
               chapters.add(chapter);
               print('Chapter loaded: ${chapter['title']} (order: ${chapter['order']}, content: ${chapter['content']?.toString().length ?? 0} chars)');
@@ -448,14 +468,13 @@ class _BookDetailState extends State<BookDetail> {
     }
   }
 
-  void _navigateToReader() async {
+  void _navigateToChapterList() async {
     if (_chapters.isEmpty) {
       _showMessage('No chapters available to read');
       return;
     }
 
-    print('Navigating to reader with ${_chapters.length} chapters');
-    print('First chapter: ${_chapters[0]}');
+    print('Navigating to chapter list with ${_chapters.length} chapters');
 
     // Track the read action using analytics service
     try {
@@ -469,19 +488,21 @@ class _BookDetailState extends State<BookDetail> {
       // Don't block navigation if tracking fails
     }
 
-    // Navigate to the separate BookReaderPage
+    // Navigate to the ChapterListPage instead of BookReaderPage
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BookReaderPage(
+        builder: (context) => ChapterListPage(
           chapters: _chapters,
           bookTitle: widget.book['title'] ?? 'Book',
-          bookId: widget.book['id'],  // Add this line
+          bookId: widget.book['id'],
+          bookCover: _coverImageBase64, // Pass the cover image
+          bookDescription: widget.book['description'], // Pass the description
         ),
       ),
     ).catchError((error) {
       print('Navigation error: $error');
-      _showMessage('Error opening reader');
+      _showMessage('Error opening chapter list');
     });
   }
 
@@ -579,9 +600,46 @@ class _BookDetailState extends State<BookDetail> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
-            Text(
-              widget.book['description']!,
-              style: TextStyle(fontSize: 16, height: 1.5),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedCrossFade(
+                  firstChild: Text(
+                    widget.book['description']!,
+                    style: TextStyle(fontSize: 16, height: 1.5),
+                    maxLines: _descriptionMaxLines,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  secondChild: Text(
+                    widget.book['description']!,
+                    style: TextStyle(fontSize: 16, height: 1.5),
+                  ),
+                  crossFadeState: _isDescriptionExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: Duration(milliseconds: 200),
+                ),
+                if (_isDescriptionLong())
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _isDescriptionExpanded = !_isDescriptionExpanded;
+                      });
+                    },
+                    child: Text(
+                      _isDescriptionExpanded ? 'Show less' : 'Read more',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+              ],
             ),
 
             SizedBox(height: 32),
@@ -591,9 +649,9 @@ class _BookDetailState extends State<BookDetail> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _chapters.isNotEmpty ? _navigateToReader : null,
+                    onPressed: _chapters.isNotEmpty ? _navigateToChapterList : null,
                     icon: Icon(Icons.menu_book),
-                    label: Text('Read'),
+                    label: Text('View Chapters'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
