@@ -188,12 +188,17 @@ class _ChapterListPageState extends State<ChapterListPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.payment, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('Payment Setup Required'),
-          ],
+        title: Container( // Replace LayoutBuilder with this
+          width: double.infinity,
+          child: Row(
+            children: [
+              Icon(Icons.payment, color: Colors.orange),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text('Payment Setup Required'),
+              ),
+            ],
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
