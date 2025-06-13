@@ -14,14 +14,40 @@ class CreateBookPage extends StatefulWidget {
 
 class _CreateBookPageState extends State<CreateBookPage> {
   final _formKey = GlobalKey<FormState>();
+  final _descriptionController = TextEditingController(); // Added controller for description
   String _title = '';
   String _description = '';
   File? _coverImage;
   bool _isLoading = false;
+  int _descriptionWordCount = 0; // Track word count
 
   final ImagePicker _picker = ImagePicker();
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to description changes
+    _descriptionController.addListener(() {
+      setState(() {
+        _descriptionWordCount = _countWords(_descriptionController.text);
+        _description = _descriptionController.text;
+      });
+    });
+  }
+
+  // Helper function to count words
+  int _countWords(String text) {
+    if (text.trim().isEmpty) return 0;
+    return text.trim().split(RegExp(r'\s+')).length;
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickCoverImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -31,6 +57,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
       });
     }
   }
+
   // from romaisa: added this function
   Future<void> _updateUserAuthorStatus() async {
     try {
@@ -50,6 +77,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
       print('Error updating user author status: $e');
     }
   }
+
   Future<String?> _convertImageToBase64() async {
     if (_coverImage == null) return null;
 
@@ -121,10 +149,9 @@ class _CreateBookPageState extends State<CreateBookPage> {
         // Save book to database under users/{userId}/books/{bookId}
         await _database.child('users/$userId/books/$bookId').set(bookData);
 
-
         // Update user role to writer
         await _updateUserRole();
- // from Romaisa: added this one line and an import (author_service.dart)
+        // from Romaisa: added this one line and an import (author_service.dart)
         await AuthorService.onBookCreated(bookId);
 
         // Create Book object for return (you'll need to create this model)
@@ -136,7 +163,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
           authorId: userId,
           createdAt: DateTime.now().millisecondsSinceEpoch,
         );
-      // from romaisa: added this one line
+        // from romaisa: added this one line
         await _updateUserAuthorStatus();
 
         setState(() {
@@ -227,28 +254,54 @@ class _CreateBookPageState extends State<CreateBookPage> {
                 },
               ),
               SizedBox(height: 20),
-              Text(
-                'Description',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Description',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '$_descriptionWordCount/2000 words',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _descriptionWordCount > 2000 ? Colors.red : Colors.grey[600],
+                      fontWeight: _descriptionWordCount > 2000 ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 8),
-              TextFormField(
-                decoration: InputDecoration(
-                  hintText: 'Enter book description',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: 200, // Prevent overflow by limiting height
                 ),
-                maxLines: 4,
-                onChanged: (value) => _description = value,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Description is required';
-                  }
-                  if (value.trim().length < 10) {
-                    return 'Description must be at least 10 characters';
-                  }
-                  return null;
-                },
+                child: TextFormField(
+                  controller: _descriptionController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter book description (max 2000 words)',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    counterText: '', // Hide default counter
+                  ),
+                  maxLines: null, // Allow multiple lines
+                  minLines: 4, // Start with 4 lines
+                  textAlignVertical: TextAlignVertical.top,
+                  expands: false,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Description is required';
+                    }
+                    if (value.trim().length < 10) {
+                      return 'Description must be at least 10 characters';
+                    }
+                    int wordCount = _countWords(value);
+                    if (wordCount > 2000) {
+                      return 'Description cannot exceed 2000 words (currently $wordCount words)';
+                    }
+                    return null;
+                  },
+                ),
               ),
               SizedBox(height: 20),
               Text(

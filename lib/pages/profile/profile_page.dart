@@ -9,6 +9,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:image/image.dart' as img;
 import '../writing_dashboard.dart';
 import 'settings_page.dart';
+import 'package:inkflow_mad_sem_project/pages/books/book_detail.dart'; // Add this import
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -334,6 +335,37 @@ class _ProfilePageState extends State<ProfilePage> {
 
     // Default book icon - you can change this to your preferred asset
     return AssetImage('assets/profile.jpeg'); // Using existing asset as fallback
+  }
+
+  // Navigate to book detail page
+  void _navigateToBookDetail(Map<String, dynamic> book) {
+    try {
+      // Convert Map<String, dynamic> to Map<String, String> as required by BookDetail
+      Map<String, String> bookData = {
+        'id': book['id']?.toString() ?? '',
+        'title': book['title']?.toString() ?? 'Untitled',
+        'description': book['description']?.toString() ?? 'No description',
+        'authorId': book['authorId']?.toString() ?? '',
+        'author': _username, // Use current user's username as author
+        'coverImage': book['coverImage']?.toString() ?? '',
+        'createdAt': book['createdAt']?.toString() ?? '',
+        'status': book['status']?.toString() ?? 'draft',
+      };
+
+      print('Navigating to BookDetail with data: $bookData');
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BookDetail(book: bookData),
+        ),
+      );
+    } catch (e) {
+      print('Error navigating to book detail: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error opening book details')),
+      );
+    }
   }
 
   // Compress and resize image
@@ -707,54 +739,57 @@ class _ProfilePageState extends State<ProfilePage> {
                 itemCount: _writtenBooks.length,
                 itemBuilder: (context, index) {
                   final book = _writtenBooks[index];
-                  return Card(
-                    elevation: 4,
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(8),
+                  return InkWell(
+                    onTap: () => _navigateToBookDetail(book),
+                    child: Card(
+                      elevation: 4,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(8),
+                                ),
                               ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(8),
-                              ),
-                              child: Image(
-                                image: _getBookCoverImageProvider(book),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[300],
-                                    child: Icon(
-                                      Icons.book,
-                                      size: 50,
-                                      color: Colors.grey[600],
-                                    ),
-                                  );
-                                },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(8),
+                                ),
+                                child: Image(
+                                  image: _getBookCoverImageProvider(book),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[300],
+                                      child: Icon(
+                                        Icons.book,
+                                        size: 50,
+                                        color: Colors.grey[600],
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Text(
-                            book['title'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
+                          Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Text(
+                              book['title'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },

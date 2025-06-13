@@ -6,6 +6,7 @@ import '../models/book_model.dart';
 import '../models/chapter_model.dart'; // Your enhanced chapter model
 import 'AddChapterPage.dart';
 import '../widgets/chapter_card.dart';
+import 'package:inkflow_mad_sem_project/pages/Analytics/book_analytics_page.dart'; // Add this import
 
 class BookDetailsPage extends StatefulWidget {
   final Book book;
@@ -20,6 +21,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   List<Chapter> chapters = [];
   bool _isLoading = true;
   bool _disposed = false;
+  bool _isDescriptionExpanded = false; // Track if description is expanded
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
@@ -135,6 +137,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
               }
             });
           },
+        ),
+      ),
+    );
+  }
+
+  void _openBookAnalytics() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BookAnalyticsPage(
+          book: widget.book,
         ),
       ),
     );
@@ -336,6 +349,48 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     );
   }
 
+  // Build description with expand/collapse functionality
+  Widget _buildDescription() {
+    final description = widget.book.description;
+    final isLongDescription = description.length > 200; // Show "Read more" for descriptions over 200 characters
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          child: Text(
+            _isDescriptionExpanded || !isLongDescription
+                ? description
+                : '${description.substring(0, 200)}...',
+            style: TextStyle(fontSize: 16, color: Colors.grey[600], height: 1.4),
+            textAlign: TextAlign.center,
+            softWrap: true,
+          ),
+        ),
+        if (isLongDescription) ...[
+          SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _isDescriptionExpanded = !_isDescriptionExpanded;
+                });
+              },
+              child: Text(
+                _isDescriptionExpanded ? 'Show Less' : 'Read More',
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -343,6 +398,12 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         title: Text(widget.book.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // Analytics button
+          IconButton(
+            icon: Icon(Icons.analytics, color: Colors.blue),
+            onPressed: _openBookAnalytics,
+            tooltip: 'Book Analytics',
+          ),
           // Delete Book button
           IconButton(
             icon: Icon(Icons.delete_forever, color: Colors.red),
@@ -362,7 +423,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView( // Wrap in SingleChildScrollView to prevent overflow
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
@@ -373,18 +434,16 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             ),
             SizedBox(height: 12),
 
-            // Book title and description
+            // Book title
             Text(
               widget.book.title,
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 8),
-            Text(
-              widget.book.description,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
+
+            // Book description with expand/collapse functionality
+            _buildDescription(),
             SizedBox(height: 20),
 
             // Add Chapter button
@@ -414,8 +473,9 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             ),
             SizedBox(height: 10),
 
-            // Chapters list
-            Expanded(
+            // Chapters list - Use a fixed height container instead of Expanded
+            Container(
+              height: 300, // Fixed height for chapters section
               child: chapters.isEmpty
                   ? Center(
                 child: Column(

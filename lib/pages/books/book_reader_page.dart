@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:inkflow_mad_sem_project/services/reading_analytics_service.dart';
 
 class BookReaderPage extends StatefulWidget {
   final List<Map<String, dynamic>> chapters;
   final String bookTitle;
+  final String? bookId;  // Add this line
 
   const BookReaderPage({
     Key? key,
     required this.chapters,
     required this.bookTitle,
+    this.bookId,  // Add this line
   }) : super(key: key);
 
   @override
@@ -20,6 +23,8 @@ class _BookReaderPageState extends State<BookReaderPage> {
   late List<Map<String, dynamic>> _sortedChapters;
   double _fontSize = 18.0;
   bool _isDarkMode = false;
+  String? _currentSessionId;
+  String? _bookId;
 
   @override
   void initState() {
@@ -102,12 +107,47 @@ class _BookReaderPageState extends State<BookReaderPage> {
 
     print('BookReaderPage initialized with ${_sortedChapters.length} chapters');
     print('Starting with chapter: ${_sortedChapters[_currentChapterIndex]['title']}');
+
+    // START READING TIME TRACKING
+    _startReadingSession();
+  }
+
+  // Add this new method after initState
+  void _startReadingSession() async {
+    try {
+      if (widget.bookId != null) {
+        _bookId = widget.bookId;
+        _currentSessionId = await ReadingAnalyticsService.startReadingSession(_bookId!);
+        print('Started reading session: $_currentSessionId for book: $_bookId');
+      } else {
+        print('No book ID provided, cannot track reading time');
+      }
+    } catch (e) {
+      print('Error starting reading session: $e');
+    }
   }
 
   @override
   void dispose() {
+    // END READING TIME TRACKING
+    _endReadingSession();
+
     _pageController.dispose();
     super.dispose();
+  }
+
+  // Add this new method after dispose
+  void _endReadingSession() async {
+    try {
+      if (_currentSessionId != null && _bookId != null) {
+        await ReadingAnalyticsService.endReadingSession(_bookId!, _currentSessionId!);
+        print('Ended reading session: $_currentSessionId');
+      } else {
+        print('No active reading session to end');
+      }
+    } catch (e) {
+      print('Error ending reading session: $e');
+    }
   }
 
   void _goToNextChapter() {

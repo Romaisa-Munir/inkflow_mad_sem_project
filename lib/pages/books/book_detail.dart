@@ -3,6 +3,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'book_reader_page.dart';
+import 'package:inkflow_mad_sem_project/services/reading_analytics_service.dart';
+
 
 class BookDetail extends StatefulWidget {
   final Map<String, String> book;
@@ -197,6 +199,7 @@ class _BookDetailState extends State<BookDetail> {
           setState(() {
             _chapters = [];
           });
+
         }
       } else {
         print('Book data not found at users/$authorId/books/$bookId');
@@ -445,7 +448,7 @@ class _BookDetailState extends State<BookDetail> {
     }
   }
 
-  void _navigateToReader() {
+  void _navigateToReader() async {
     if (_chapters.isEmpty) {
       _showMessage('No chapters available to read');
       return;
@@ -454,6 +457,18 @@ class _BookDetailState extends State<BookDetail> {
     print('Navigating to reader with ${_chapters.length} chapters');
     print('First chapter: ${_chapters[0]}');
 
+    // Track the read action using analytics service
+    try {
+      String? bookId = widget.book['id'];
+      if (bookId != null) {
+        await ReadingAnalyticsService.incrementReadCount(bookId);
+        print('Read count incremented for book: $bookId');
+      }
+    } catch (e) {
+      print('Error tracking read: $e');
+      // Don't block navigation if tracking fails
+    }
+
     // Navigate to the separate BookReaderPage
     Navigator.push(
       context,
@@ -461,6 +476,7 @@ class _BookDetailState extends State<BookDetail> {
         builder: (context) => BookReaderPage(
           chapters: _chapters,
           bookTitle: widget.book['title'] ?? 'Book',
+          bookId: widget.book['id'],  // Add this line
         ),
       ),
     ).catchError((error) {
