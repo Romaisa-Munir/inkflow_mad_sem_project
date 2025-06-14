@@ -198,16 +198,62 @@ class _BookDetailState extends State<BookDetail> {
                 'id': chapterId,
                 'title': chapterData['title'] ?? 'Untitled Chapter',
                 'content': chapterData['content'] ?? '',
-                'order': chapterData['order'] ?? chapters.length,
                 'price': (chapterData['price'] ?? 0.0).toDouble(),
               };
+
+              // Add createdAt if it exists
+              if (chapterData['createdAt'] != null) {
+                chapter['createdAt'] = chapterData['createdAt'];
+              }
+
+              // Add order if it exists (for legacy chapters)
+              if (chapterData['order'] != null) {
+                chapter['order'] = chapterData['order'];
+              }
+
               chapters.add(chapter);
-              print('Chapter loaded: ${chapter['title']} (order: ${chapter['order']}, content: ${chapter['content']?.toString().length ?? 0} chars)');
+              print('Chapter loaded: ${chapter['title']} (order: ${chapter['order']}, createdAt: ${chapter['createdAt']}, content: ${chapter['content']?.toString().length ?? 0} chars)');
             }
           });
 
-          // Sort chapters by order
-          chapters.sort((a, b) => (a['order'] as int).compareTo(b['order'] as int));
+          // Sort chapters - prefer order field, fallback to createdAt
+          bool hasOrderFields = chapters.any((chapter) => chapter['order'] != null);
+          bool hasCreatedAt = chapters.any((chapter) => chapter['createdAt'] != null);
+
+          if (hasOrderFields) {
+            print('=== SORTING BY ORDER FIELD ===');
+            chapters.sort((a, b) {
+              int orderA = a['order'] ?? 999;
+              int orderB = b['order'] ?? 999;
+              return orderA.compareTo(orderB);
+            });
+          } else if (hasCreatedAt) {
+            print('=== SORTING BY CREATION TIME ===');
+            chapters.sort((a, b) {
+              int timeA = a['createdAt'] ?? 0;
+              int timeB = b['createdAt'] ?? 0;
+              return timeA.compareTo(timeB); // Earliest created = first in reading order
+            });
+          } else {
+            print('=== NO SORTING FIELDS AVAILABLE ===');
+          }
+
+          // Debug: Print final order
+          if (hasOrderFields) {
+            print('=== CHAPTERS SORTED BY ORDER FIELD ===');
+            for (int i = 0; i < chapters.length; i++) {
+              var chapter = chapters[i];
+              print('Position $i: "${chapter['title']}" (order: ${chapter['order']})');
+            }
+          } else if (hasCreatedAt) {
+            print('=== CHAPTERS SORTED BY CREATION TIME ===');
+            for (int i = 0; i < chapters.length; i++) {
+              var chapter = chapters[i];
+              DateTime createdDate = DateTime.fromMillisecondsSinceEpoch(chapter['createdAt']);
+              int timestamp = chapter['createdAt'];
+              print('Position $i: "${chapter['title']}" (timestamp: $timestamp, date: $createdDate)');
+            }
+          }
 
           setState(() {
             _chapters = chapters;
@@ -219,7 +265,6 @@ class _BookDetailState extends State<BookDetail> {
           setState(() {
             _chapters = [];
           });
-
         }
       } else {
         print('Book data not found at users/$authorId/books/$bookId');
@@ -467,6 +512,39 @@ class _BookDetailState extends State<BookDetail> {
       });
     }
   }
+  // Add this function to your BookDetail page or wherever you load chapters
+
+  Future<void> removeOrderFieldsFromChapters(String bookId) async {
+    try {
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      final DatabaseReference chaptersRef = FirebaseDatabase.instance
+          .ref()
+          .child('users')
+          .child(currentUser.uid)
+          .child('books')
+          .child(bookId)
+          .child('chapters');
+
+      // Get all chapters
+      final snapshot = await chaptersRef.get();
+
+      if (snapshot.exists && snapshot.value != null) {
+        final chaptersData = Map<String, dynamic>.from(snapshot.value as Map);
+
+        // Remove 'order' field from each chapter
+        for (String chapterId in chaptersData.keys) {
+          await chaptersRef.child(chapterId).child('order').remove();
+          print('Removed order field from chapter: $chapterId');
+        }
+
+        print('Successfully removed order fields from all chapters');
+      }
+    } catch (e) {
+      print('Error removing order fields: $e');
+    }
+  }
 
   void _navigateToChapterList() async {
     if (_chapters.isEmpty) {
@@ -692,20 +770,6 @@ class _BookDetailState extends State<BookDetail> {
                   ),
                 ),
                 SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _showMessage('Purchase feature coming soon!');
-                    },
-                    icon: Icon(Icons.shopping_cart),
-                    label: Text('Buy'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
               ],
             ),
 

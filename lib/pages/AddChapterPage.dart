@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import '../models/chapter_model.dart'; // Your enhanced chapter model
+import '../models/chapter_model.dart';
 
 class AddChapterPage extends StatefulWidget {
   final String bookId;
@@ -47,7 +47,6 @@ class _AddChapterPageState extends State<AddChapterPage> {
     _priceController.dispose();
     super.dispose();
   }
-
   Future<void> _saveChapter() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -68,7 +67,7 @@ class _AddChapterPageState extends State<AddChapterPage> {
       Chapter chapter;
 
       if (widget.existingChapter != null) {
-        // Editing existing chapter
+        // Editing existing chapter - keep the same order
         chapter = widget.existingChapter!.copyWith(
           title: title,
           content: content,
@@ -93,7 +92,7 @@ class _AddChapterPageState extends State<AddChapterPage> {
           ),
         );
       } else {
-        // Adding new chapter
+        // Adding new chapter - get the next order number
         final String chapterId = _database
             .child('users')
             .child(currentUser.uid)
@@ -111,6 +110,10 @@ class _AddChapterPageState extends State<AddChapterPage> {
           createdAt: DateTime.now().millisecondsSinceEpoch,
         );
 
+        // Just use the chapter data without manual order field
+        // Let the sorting logic use createdAt instead
+        Map<String, dynamic> chapterData = chapter.toMap();
+
         // Save to Firebase
         await _database
             .child('users')
@@ -119,7 +122,9 @@ class _AddChapterPageState extends State<AddChapterPage> {
             .child(widget.bookId)
             .child('chapters')
             .child(chapterId)
-            .set(chapter.toMap());
+            .set(chapterData);
+
+        print('Created chapter "$title" with createdAt: ${DateTime.now().millisecondsSinceEpoch}');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -40,15 +40,85 @@ class _ChapterListPageState extends State<ChapterListPage> {
   void _sortChapters() {
     _sortedChapters = List.from(widget.chapters);
 
-    // Sort chapters by extracting numbers from titles first
-    _sortedChapters.sort((a, b) {
-      String titleA = (a['title'] ?? '').toLowerCase();
-      String titleB = (b['title'] ?? '').toLowerCase();
+    // Strategy 1: Sort by creation time (most reliable for reading order)
+    bool hasCreatedAt = _sortedChapters.every((chapter) =>
+    chapter['createdAt'] != null && chapter['createdAt'] is int);
 
-      // Extract numbers from titles like "chapter 1", "chapter 2", etc.
-      RegExp numberRegex = RegExp(r'(\d+)');
-      var matchA = numberRegex.firstMatch(titleA);
-      var matchB = numberRegex.firstMatch(titleB);
+    if (hasCreatedAt) {
+      _sortedChapters.sort((a, b) {
+        int timeA = a['createdAt'] as int;
+        int timeB = b['createdAt'] as int;
+        return timeA.compareTo(timeB); // Earliest created = first in reading order
+      });
+
+      print('=== CHAPTERS SORTED BY CREATION TIME ===');
+      for (int i = 0; i < _sortedChapters.length; i++) {
+        var chapter = _sortedChapters[i];
+        DateTime createdDate = DateTime.fromMillisecondsSinceEpoch(chapter['createdAt']);
+        int timestamp = chapter['createdAt'];
+        print('Position $i: "${chapter['title']}" (timestamp: $timestamp, date: $createdDate)');
+      }
+      return; // Exit early - creation time is the most reliable
+    }
+
+    // Strategy 2: Try to sort by the 'order' field if it exists and makes sense
+    bool hasValidOrderField = _sortedChapters.every((chapter) =>
+    chapter['order'] != null && chapter['order'] is int);
+
+    if (hasValidOrderField) {
+      // Check if order values are unique and make sense
+      Set<int> orderValues = _sortedChapters.map((ch) => ch['order'] as int).toSet();
+      if (orderValues.length == _sortedChapters.length) {
+        // Order field exists and has unique values - use it!
+        _sortedChapters.sort((a, b) {
+          int orderA = a['order'] as int;
+          int orderB = b['order'] as int;
+          return orderA.compareTo(orderB);
+        });
+
+        print('=== CHAPTERS SORTED BY ORDER FIELD ===');
+        for (int i = 0; i < _sortedChapters.length; i++) {
+          var chapter = _sortedChapters[i];
+          print('Position $i: "${chapter['title']}" (order: ${chapter['order']})');
+        }
+        return; // Exit early if order field worked
+      }
+    }
+
+    // Strategy 3: Smart title sorting with special handling for common patterns
+    _sortedChapters.sort((a, b) {
+      String titleA = (a['title'] ?? '').toLowerCase().trim();
+      String titleB = (b['title'] ?? '').toLowerCase().trim();
+
+      // Special handling for common patterns
+      Map<String, int> specialOrder = {
+        'prologue': -1000,
+        'preface': -999,
+        'introduction': -998,
+        'intro': -997,
+        'epilogue': 9999,
+        'conclusion': 9998,
+        'afterword': 9997,
+      };
+
+      // Check if either title is a special case
+      int priorityA = specialOrder[titleA] ?? 0;
+      int priorityB = specialOrder[titleB] ?? 0;
+
+      if (priorityA != 0 || priorityB != 0) {
+        if (priorityA != 0 && priorityB != 0) {
+          return priorityA.compareTo(priorityB);
+        } else if (priorityA != 0) {
+          return priorityA < 0 ? -1 : 1; // Negative = comes first, positive = comes last
+        } else {
+          return priorityB < 0 ? 1 : -1;
+        }
+      }
+
+      // Extract numbers from regular chapter titles
+      RegExp chapterRegex = RegExp(r'chapter\s*(\d+)', caseSensitive: false);
+      var matchA = chapterRegex.firstMatch(titleA);
+      var matchB = chapterRegex.firstMatch(titleB);
 
       if (matchA != null && matchB != null) {
         int numA = int.parse(matchA.group(1)!);
@@ -56,29 +126,29 @@ class _ChapterListPageState extends State<ChapterListPage> {
         return numA.compareTo(numB);
       }
 
-      // If no numbers found, sort alphabetically
+      // If one has chapter number and other doesn't, chapter numbers come after special titles
+      if (matchA != null && matchB == null) return 1;
+      if (matchA == null && matchB != null) return -1;
+
+      // Extract any numbers from titles as last resort
+      RegExp numberRegex = RegExp(r'(\d+)');
+      var numMatchA = numberRegex.firstMatch(titleA);
+      var numMatchB = numberRegex.firstMatch(titleB);
+
+      if (numMatchA != null && numMatchB != null) {
+        int numA = int.parse(numMatchA.group(1)!);
+        int numB = int.parse(numMatchB.group(1)!);
+        return numA.compareTo(numB);
+      }
+
+      // Final fallback: alphabetical
       return titleA.compareTo(titleB);
     });
 
-    // Check if order field makes sense and use it if reliable
-    bool orderFieldMakesSense = true;
-    if (_sortedChapters.length > 1) {
-      for (int i = 0; i < _sortedChapters.length - 1; i++) {
-        int currentOrder = _sortedChapters[i]['order'] ?? i;
-        int nextOrder = _sortedChapters[i + 1]['order'] ?? i + 1;
-        if (currentOrder >= nextOrder) {
-          orderFieldMakesSense = false;
-          break;
-        }
-      }
-    }
-
-    if (orderFieldMakesSense && _sortedChapters.every((ch) => ch['order'] != null)) {
-      _sortedChapters.sort((a, b) {
-        int orderA = a['order'] ?? 999;
-        int orderB = b['order'] ?? 999;
-        return orderA.compareTo(orderB);
-      });
+    print('=== CHAPTERS SORTED BY SMART TITLE LOGIC ===');
+    for (int i = 0; i < _sortedChapters.length; i++) {
+      var chapter = _sortedChapters[i];
+      print('Position $i: "${chapter['title']}"');
     }
   }
 
