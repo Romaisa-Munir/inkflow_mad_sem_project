@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_ai/firebase_ai.dart'; // Add this line
 import 'package:flutter/material.dart';
 import 'package:inkflow_mad_sem_project/pages/authors/authors_page.dart';
 import 'package:inkflow_mad_sem_project/pages/books/book_detail.dart';
@@ -9,8 +10,6 @@ import 'package:inkflow_mad_sem_project/pages/library/library_page.dart';
 import 'firebase_options.dart';
 import 'pages/login_signup/login_screen.dart';
 import 'pages/login_signup/signup_screen.dart';
-import 'package:standard_searchbar/old/standard_searchbar.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

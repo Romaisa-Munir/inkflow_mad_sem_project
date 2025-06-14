@@ -6,6 +6,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/book_model.dart';
 import '../services/author_service.dart';
+import '../services/ai_service.dart';
 
 class CreateBookPage extends StatefulWidget {
   @override
@@ -14,12 +15,15 @@ class CreateBookPage extends StatefulWidget {
 
 class _CreateBookPageState extends State<CreateBookPage> {
   final _formKey = GlobalKey<FormState>();
-  final _descriptionController = TextEditingController(); // Added controller for description
+  final _descriptionController = TextEditingController();
+  final _titleController = TextEditingController();
   String _title = '';
   String _description = '';
   File? _coverImage;
   bool _isLoading = false;
-  int _descriptionWordCount = 0; // Track word count
+  int _descriptionWordCount = 0;
+  List<String> _suggestedTitles = [];
+  bool _isGeneratingTitles = false;
 
   final ImagePicker _picker = ImagePicker();
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
@@ -35,6 +39,13 @@ class _CreateBookPageState extends State<CreateBookPage> {
         _description = _descriptionController.text;
       });
     });
+
+    // Add listener for title controller
+    _titleController.addListener(() {
+      setState(() {
+        _title = _titleController.text;
+      });
+    });
   }
 
   // Helper function to count words
@@ -46,7 +57,43 @@ class _CreateBookPageState extends State<CreateBookPage> {
   @override
   void dispose() {
     _descriptionController.dispose();
+    _titleController.dispose();
     super.dispose();
+  }
+
+  Future<void> _generateTitles() async {
+    if (_descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please enter a book description first')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isGeneratingTitles = true;
+      _suggestedTitles = [];
+    });
+
+    try {
+      final titles = await AIService.generateBookTitles(_descriptionController.text);
+      setState(() {
+        _suggestedTitles = titles;
+      });
+
+      if (titles.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not generate titles. Please try again.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to generate titles: $e')),
+      );
+    } finally {
+      setState(() {
+        _isGeneratingTitles = false;
+      });
+    }
   }
 
   Future<void> _pickCoverImage() async {
@@ -58,18 +105,15 @@ class _CreateBookPageState extends State<CreateBookPage> {
     }
   }
 
-  // from romaisa: added this function
   Future<void> _updateUserAuthorStatus() async {
     try {
       final String userId = _auth.currentUser!.uid;
 
-      // Set the isAuthor flag and update lastActive
       await _database.child('users/$userId').update({
         'isAuthor': true,
         'lastActive': DateTime.now().millisecondsSinceEpoch,
       });
 
-      // Also update the role to writer in the profile section
       await _database.child('users/$userId/profile/role').set('writer');
 
       print('Updated user author status for user: $userId');
@@ -105,7 +149,6 @@ class _CreateBookPageState extends State<CreateBookPage> {
       final String userId = _auth.currentUser!.uid;
       final DatabaseEvent event = await _database.child('users/$userId/books').once();
 
-      // If books collection doesn't exist, create it with initial structure
       if (!event.snapshot.exists) {
         await _database.child('users/$userId/books').set({});
       }
@@ -123,38 +166,30 @@ class _CreateBookPageState extends State<CreateBookPage> {
       try {
         final String userId = _auth.currentUser!.uid;
 
-        // Ensure books collection exists under user
         await _createBooksCollectionIfNeeded();
 
-        // Generate unique book ID
         final String bookId = _database.child('users/$userId/books').push().key!;
 
-        // Convert cover image to base64 if selected
         String? coverBase64;
         if (_coverImage != null) {
           coverBase64 = await _convertImageToBase64();
         }
 
-        // Create book data structure
         final Map<String, dynamic> bookData = {
           'id': bookId,
           'title': _title,
           'description': _description,
-          'coverImage': coverBase64, // Store as base64 string
+          'coverImage': coverBase64,
           'createdAt': DateTime.now().millisecondsSinceEpoch,
           'authorId': userId,
-          'status': 'draft', // Can be 'draft', 'published', etc.
+          'status': 'draft',
         };
 
-        // Save book to database under users/{userId}/books/{bookId}
         await _database.child('users/$userId/books/$bookId').set(bookData);
 
-        // Update user role to writer
         await _updateUserRole();
-        // from Romaisa: added this one line and an import (author_service.dart)
         await AuthorService.onBookCreated(bookId);
 
-        // Create Book object for return (you'll need to create this model)
         final newBook = Book(
           id: bookId,
           title: _title,
@@ -163,14 +198,13 @@ class _CreateBookPageState extends State<CreateBookPage> {
           authorId: userId,
           createdAt: DateTime.now().millisecondsSinceEpoch,
         );
-        // from romaisa: added this one line
+
         await _updateUserAuthorStatus();
 
         setState(() {
           _isLoading = false;
         });
 
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Book created successfully!'),
@@ -179,7 +213,6 @@ class _CreateBookPageState extends State<CreateBookPage> {
           ),
         );
 
-        // Navigate back with the new book
         Navigator.pop(context, newBook);
 
       } catch (e) {
@@ -187,7 +220,6 @@ class _CreateBookPageState extends State<CreateBookPage> {
           _isLoading = false;
         });
 
-        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error creating book: ${e.toString()}'),
@@ -237,12 +269,12 @@ class _CreateBookPageState extends State<CreateBookPage> {
               ),
               SizedBox(height: 8),
               TextFormField(
+                controller: _titleController,
                 decoration: InputDecoration(
-                  hintText: 'Enter book title',
+                  hintText: 'Enter book title or use AI suggestions below',
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                onChanged: (value) => _title = value,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Title is required';
@@ -274,7 +306,7 @@ class _CreateBookPageState extends State<CreateBookPage> {
               SizedBox(height: 8),
               Container(
                 constraints: BoxConstraints(
-                  maxHeight: 200, // Prevent overflow by limiting height
+                  maxHeight: 200,
                 ),
                 child: TextFormField(
                   controller: _descriptionController,
@@ -282,10 +314,10 @@ class _CreateBookPageState extends State<CreateBookPage> {
                     hintText: 'Enter book description (max 2000 words)',
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    counterText: '', // Hide default counter
+                    counterText: '',
                   ),
-                  maxLines: null, // Allow multiple lines
-                  minLines: 4, // Start with 4 lines
+                  maxLines: null,
+                  minLines: 4,
                   textAlignVertical: TextAlignVertical.top,
                   expands: false,
                   validator: (value) {
@@ -303,6 +335,119 @@ class _CreateBookPageState extends State<CreateBookPage> {
                   },
                 ),
               ),
+              SizedBox(height: 20),
+
+              // AI Title Generation Button
+              ElevatedButton.icon(
+                onPressed: _isGeneratingTitles ? null : _generateTitles,
+                icon: _isGeneratingTitles
+                    ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+                    : Icon(Icons.auto_awesome, color: Colors.white),
+                label: Text(
+                  _isGeneratingTitles ? 'Generating AI Titles...' : 'Generate AI Title Suggestions',
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+
+              // AI Suggestions Display
+              if (_suggestedTitles.isNotEmpty) ...[
+                SizedBox(height: 20),
+                Text(
+                  '✨ AI Suggested Titles',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                  ),
+                  padding: EdgeInsets.all(12),
+                  child: Column(
+                    children: _suggestedTitles.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final title = entry.value;
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          elevation: 1,
+                          borderRadius: BorderRadius.circular(8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.purple,
+                              radius: 16,
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 15,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: Colors.purple,
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _titleController.text = title;
+                                _title = title;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(Icons.check_circle, color: Colors.white),
+                                      SizedBox(width: 8),
+                                      Expanded(child: Text('Title selected: $title')),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Tap any title above to use it for your book',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+
               SizedBox(height: 20),
               Text(
                 'Cover Image (Optional)',
