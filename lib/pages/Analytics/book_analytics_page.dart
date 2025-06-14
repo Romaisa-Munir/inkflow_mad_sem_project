@@ -227,7 +227,7 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
 
   // New method to format earnings
   String _formatEarnings(double earnings) {
-    return '\$${earnings.toStringAsFixed(2)}';
+    return 'PKR ${earnings.toStringAsFixed(2)}';
   }
 
   void _showError(String message) {
@@ -425,7 +425,7 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
                 _buildAnalyticsCard(
                   'Total Earnings',
                   _formatEarnings(_totalEarnings),
-                  Icons.attach_money,
+                  Icons.payments,
                   Colors.green,
                 ),
                 _buildAnalyticsCard(
