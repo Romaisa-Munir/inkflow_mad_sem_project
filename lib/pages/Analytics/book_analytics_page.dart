@@ -23,6 +23,7 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
   int _totalReads = 0;
   int _totalReadingTimeMinutes = 0;
   int _libraryAdds = 0;
+  double _totalEarnings = 0.0; // New field for earnings
   List<Map<String, dynamic>> _readersList = [];
   int _chaptersCount = 0;
 
@@ -38,10 +39,11 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
         _isLoading = true;
       });
 
-      // Load all analytics data
+      // Load all analytics data including earnings
       await Future.wait([
         _loadBookData(),
         _loadReadingData(),
+        _loadEarningsData(), // New method to load earnings
       ]);
 
       setState(() {
@@ -53,6 +55,50 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
         _isLoading = false;
       });
       _showError('Failed to load analytics data');
+    }
+  }
+
+  // New method to load earnings data
+  Future<void> _loadEarningsData() async {
+    try {
+      print('Loading earnings data for book: ${widget.book.id}');
+
+      // Query the purchases node
+      DatabaseEvent purchasesEvent = await _database.child('analytics').child('purchases').once();
+
+      if (!purchasesEvent.snapshot.exists || purchasesEvent.snapshot.value == null) {
+        print('No purchases found in analytics');
+        setState(() {
+          _totalEarnings = 0.0;
+        });
+        return;
+      }
+
+      Map<dynamic, dynamic> allPurchases = purchasesEvent.snapshot.value as Map<dynamic, dynamic>;
+      double earnings = 0.0;
+
+      // Iterate through all purchase records
+      for (var purchaseKey in allPurchases.keys) {
+        Map<dynamic, dynamic> purchase = allPurchases[purchaseKey] as Map<dynamic, dynamic>;
+
+        // Check if this purchase is for our book
+        if (purchase['bookId'] == widget.book.id) {
+          double price = (purchase['price'] ?? 0).toDouble();
+          earnings += price;
+          print('Found purchase: $purchaseKey, Price: $price');
+        }
+      }
+
+      setState(() {
+        _totalEarnings = earnings;
+      });
+
+      print('Total earnings for book ${widget.book.id}: \$${earnings.toStringAsFixed(2)}');
+    } catch (e) {
+      print('Error loading earnings data: $e');
+      setState(() {
+        _totalEarnings = 0.0;
+      });
     }
   }
 
@@ -177,6 +223,11 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
       int minutes = (milliseconds / 60000).round();
       return '${minutes}m';
     }
+  }
+
+  // New method to format earnings
+  String _formatEarnings(double earnings) {
+    return '\$${earnings.toStringAsFixed(2)}';
   }
 
   void _showError(String message) {
@@ -371,6 +422,12 @@ class _BookAnalyticsPageState extends State<BookAnalyticsPage> {
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               children: [
+                _buildAnalyticsCard(
+                  'Total Earnings',
+                  _formatEarnings(_totalEarnings),
+                  Icons.attach_money,
+                  Colors.green,
+                ),
                 _buildAnalyticsCard(
                   'Total Likes',
                   _totalLikes.toString(),
