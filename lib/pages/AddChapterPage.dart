@@ -264,9 +264,9 @@ class _AddChapterPageState extends State<AddChapterPage> {
                 TextFormField(
                   controller: _priceController,
                   decoration: InputDecoration(
-                    labelText: 'Chapter Price (\$)',
+                    labelText: 'Chapter Price (\PKR)',
                     border: OutlineInputBorder(),
-                    prefixText: '\$ ',
+                    prefixText: '\PKR ',
                   ),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {

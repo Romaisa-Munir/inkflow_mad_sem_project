@@ -162,7 +162,7 @@ class _WritingDashboardState extends State<WritingDashboard> {
               color: Colors.grey[400],
             ),
             SizedBox(height: 16),
-            Text(
+            Text( 
               "No books yet. Tap + to create one!",
               style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
